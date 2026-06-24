@@ -199,7 +199,7 @@ def test_tampered_manifest_anchor_invalid(
 def test_anchor_commits_mismatch_detected(
     mcap_path: Path, tmp_path: Path, patched_submit: None
 ) -> None:
-    """Zeroing 'commits' triggers INVALID anchor message; exit code stays 0 (anchor is informational)."""
+    """Zeroing 'commits' triggers INVALID anchor message; exit 0 (anchor is informational)."""
     seal_path = tmp_path / "out.seal.json"
     seal(mcap_path, key_path=None, out_path=seal_path, do_anchor=True)
 
