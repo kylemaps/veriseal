@@ -14,9 +14,6 @@ app = typer.Typer(
 )
 console = Console()
 
-_NOT_IMPLEMENTED = "[bold yellow]Not implemented in v0.1 scaffold.[/bold yellow]"
-
-
 @app.command()
 def seal(
     path: Path = typer.Argument(..., help="Path to the .mcap file to seal."),
@@ -47,10 +44,18 @@ def verify(
 @app.command()
 def inspect(
     path: Path = typer.Argument(..., help="Path to the .mcap file to inspect."),
-    from_time: str = typer.Option(..., "--from", help="Start of window (ISO 8601 or ROS time)."),
-    to_time: str = typer.Option(..., "--to", help="End of window (ISO 8601 or ROS time)."),
+    from_time: str = typer.Option(..., "--from", help="Window start: ns-since-epoch or ISO-8601."),
+    to_time: str = typer.Option(..., "--to", help="Window end: ns-since-epoch or ISO-8601."),
     topic: str | None = typer.Option(None, "--topic", help="Filter to a single topic."),
+    out: Path | None = typer.Option(None, "--out", help="Output path for the incident.mcap."),
 ) -> None:
-    """Print a chronological event timeline for the window; export sliced incident.mcap."""
-    console.print(_NOT_IMPLEMENTED)
-    raise typer.Exit(code=2)
+    """Print chronological timeline for the window; export Foxglove-openable incident.mcap."""
+    from veriseal.inspect import inspect_mcap, parse_time
+
+    try:
+        from_ns = parse_time(from_time)
+        to_ns = parse_time(to_time)
+    except ValueError as exc:
+        console.print(f"[bold red]ERROR:[/bold red] {exc}")
+        raise typer.Exit(code=2)
+    raise typer.Exit(code=inspect_mcap(path, from_ns, to_ns, topic, out))
