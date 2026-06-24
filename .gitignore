@@ -29,3 +29,6 @@ htmlcov/
 
 # Spec — never commit
 incident-evidence-tool-spec.md
+
+# E2E scratch files
+_e2e*

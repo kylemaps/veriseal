@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -139,4 +141,37 @@ def verify_seal(mcap_path: Path, seal_path: Path) -> int:
         for topic, log_time in additions:
             console.print(f"  [yellow]ADDED[/yellow]     topic={topic!r} log_time={log_time}")
 
+    # ── Anchor check (informational — does not change exit code) ──────────────
+    anchor = manifest.get("anchor")
+    if anchor and anchor.get("type") == "opentimestamps":
+        _check_anchor(manifest, anchor)
+
     return 0 if intact else 1
+
+
+def _check_anchor(manifest: dict, anchor: dict) -> None:
+    """Print informational anchor status; does not raise or affect the exit code."""
+    try:
+        payload_for_anchor = {k: v for k, v in manifest.items() if k != "anchor"}
+        expected_digest = hashlib.sha256(canonical_json(payload_for_anchor)).digest()
+
+        if expected_digest.hex() != anchor.get("commits", ""):
+            console.print(
+                "  [bold red]Anchor: INVALID[/bold red] — proof does not commit to this manifest"
+            )
+            return
+
+        from veriseal import anchor as anchor_mod
+
+        ots_bytes = base64.b64decode(anchor["ots_base64"])
+        status, block_height = anchor_mod.verify_anchor(expected_digest, ots_bytes)
+
+        if status == "confirmed":
+            console.print(
+                f"  [bold green]Anchor: confirmed[/bold green] (Bitcoin block #{block_height})"
+            )
+        else:
+            console.print("  [cyan]Anchor: pending[/cyan] (not yet Bitcoin-confirmed)")
+
+    except Exception as exc:
+        console.print(f"  [bold red]Anchor: ERROR[/bold red] — {exc}")

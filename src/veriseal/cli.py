@@ -21,11 +21,14 @@ def seal(
     out: Path | None = typer.Option(
         None, "--out", help="Output path for the .seal.json manifest."
     ),
+    anchor: bool = typer.Option(
+        True, "--anchor/--no-anchor", help="Submit Merkle root to OpenTimestamps calendars."
+    ),
 ) -> None:
     """Hash every message, build a Merkle tree, sign, and write manifest."""
     from veriseal.seal import seal as do_seal
 
-    do_seal(path, key, out)
+    do_seal(path, key, out, do_anchor=anchor)
 
 
 @app.command()
