@@ -70,6 +70,26 @@ def test_four_leaves_balanced():
     assert merkle_root([l0, l1, l2, l3]) == expected
 
 
+def test_five_leaves():
+    """n=5: k=4. MTH = internal(MTH([l0..l3]), l4)."""
+    ls = [leaf_hash("/t", i, bytes([i])) for i in range(5)]
+    # MTH([l0..l3]) = internal(internal(l0,l1), internal(l2,l3))
+    left = _internal(_internal(ls[0], ls[1]), _internal(ls[2], ls[3]))
+    expected = _internal(left, ls[4])
+    assert merkle_root(ls) == expected
+
+
+def test_seven_leaves():
+    """n=7: k=4. MTH = internal(MTH([l0..l3]), MTH([l4..l6]))."""
+    ls = [leaf_hash("/t", i, bytes([i])) for i in range(7)]
+    # MTH([l0..l3])
+    left = _internal(_internal(ls[0], ls[1]), _internal(ls[2], ls[3]))
+    # MTH([l4..l6]): n=3 k=2 → internal(internal(l4,l5), l6)
+    right = _internal(_internal(ls[4], ls[5]), ls[6])
+    expected = _internal(left, right)
+    assert merkle_root(ls) == expected
+
+
 def test_root_changes_on_tamper():
     leaves = [leaf_hash("/t", i, bytes([i])) for i in range(4)]
     root1 = merkle_root(leaves)
