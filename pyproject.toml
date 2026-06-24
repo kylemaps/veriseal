@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "veriseal"
+version = "0.1.0.dev0"
+description = "Tamper-evident, independently-verifiable incident packages for robot/autonomy logs (MCAP)"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Kyle Mapue", email = "kyle@mapuekyle.com" }]
+requires-python = ">=3.11"
+dependencies = [
+    "mcap>=1.1.1",
+    "cryptography>=42.0.0",
+    "opentimestamps-client>=0.7.1",
+    "typer>=0.12.0",
+    "rich>=13.7.0",
+]
+
+[project.scripts]
+veriseal = "veriseal.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/kylemaps/veriseal"
+Repository = "https://github.com/kylemaps/veriseal"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/veriseal"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.4.0",
+]
+
+[tool.ruff]
+src = ["src"]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
