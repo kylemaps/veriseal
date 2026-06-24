@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+*.whl
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# Testing & coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Ruff / linting
+.ruff_cache/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Spec — never commit
+incident-evidence-tool-spec.md
