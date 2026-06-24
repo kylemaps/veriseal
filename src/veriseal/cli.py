@@ -38,9 +38,10 @@ def verify(
         ..., help="Path to the .seal.json manifest.", metavar="PATH.seal.json"
     ),
 ) -> None:
-    """Recompute hashes, validate signature and OTS proof, report INTACT or TAMPERED."""
-    console.print(_NOT_IMPLEMENTED)
-    raise typer.Exit(code=2)
+    """Recompute hashes, validate signature, report INTACT or TAMPERED (with location)."""
+    from veriseal.verify import verify_seal
+
+    raise typer.Exit(code=verify_seal(path, seal_json))
 
 
 @app.command()
