@@ -1,4 +1,4 @@
-"""veriseal CLI — v0.1 scaffold (stubs only)."""
+"""veriseal CLI."""
 
 from __future__ import annotations
 
@@ -25,9 +25,10 @@ def seal(
         None, "--out", help="Output path for the .seal.json manifest."
     ),
 ) -> None:
-    """Hash every message, build a Merkle tree, sign, anchor via OpenTimestamps, write manifest."""
-    console.print(_NOT_IMPLEMENTED)
-    raise typer.Exit(code=2)
+    """Hash every message, build a Merkle tree, sign, and write manifest."""
+    from veriseal.seal import seal as do_seal
+
+    do_seal(path, key, out)
 
 
 @app.command()
