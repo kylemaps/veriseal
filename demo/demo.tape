@@ -6,8 +6,8 @@ Output demo/demo.gif
 
 Set Theme "Dracula"
 Set FontSize 14
-Set Width 120
-Set Height 38
+Set Width 1200
+Set Height 650
 Set Padding 20
 
 # 0. Generate sample MCAP
