@@ -131,14 +131,12 @@ def test_removed_message_locates(sealed_pair: tuple[Path, Path], tmp_path: Path)
     reduced_msgs = [m for m in _MESSAGES if not (m[0] == "/status" and m[1] == 4_000_000)]
     reduced_mcap = _write_mcap(tmp_path / "reduced2.mcap", reduced_msgs)
     from veriseal.mcap_io import iter_messages
-    from veriseal.merkle import leaf_hash as lh_fn
 
     manifest = json.loads(seal_path.read_bytes())
     manifest_keys = {(entry["topic"], entry["log_time"]) for entry in manifest["leaves"]}
     rec_keys = {(t, lt) for t, lt, _ in iter_messages(reduced_mcap)}
     removed = manifest_keys - rec_keys
     assert ("/status", 4_000_000) in removed
-    assert lh_fn  # silence unused import warning
 
 
 # ── TAMPERED: message added (ADDED) ──────────────────────────────────────────

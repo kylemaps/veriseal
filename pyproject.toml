@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "veriseal"
-version = "0.1.0.dev0"
+version = "0.1.1.dev0"
 description = "Tamper-evident, independently-verifiable incident packages for robot/autonomy logs (MCAP)"
 readme = "README.md"
 license = { text = "Apache-2.0" }
