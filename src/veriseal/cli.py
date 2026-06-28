@@ -37,11 +37,30 @@ def verify(
     seal_json: Path = typer.Argument(
         ..., help="Path to the .seal.json manifest.", metavar="PATH.seal.json"
     ),
+    pubkey: Path | None = typer.Option(
+        None,
+        "--pubkey",
+        help=(
+            "Expected Ed25519 public key (PEM). "
+            "If given, FAIL if the manifest was not signed by this exact key. "
+            "Without this flag, the key embedded in the manifest is trusted unconditionally."
+        ),
+    ),
+    require_anchor: bool = typer.Option(
+        False,
+        "--require-anchor",
+        help=(
+            "FAIL if the manifest has no anchor, if the anchor does not commit to "
+            "the recomputed digest, or if the OTS proof cannot be verified."
+        ),
+    ),
 ) -> None:
     """Recompute hashes, validate signature, report INTACT or TAMPERED (with location)."""
     from veriseal.verify import verify_seal
 
-    raise typer.Exit(code=verify_seal(path, seal_json))
+    raise typer.Exit(
+        code=verify_seal(path, seal_json, pubkey_path=pubkey, require_anchor=require_anchor)
+    )
 
 
 @app.command()
