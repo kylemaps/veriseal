@@ -27,7 +27,7 @@ def _internal(left: bytes, right: bytes) -> bytes:
 
 def _split(n: int) -> int:
     """Largest power of two strictly less than n (RFC 6962 §2.1)."""
-    return 1 << (n - 1).bit_length() - 1
+    return 1 << ((n - 1).bit_length() - 1)
 
 
 def merkle_root(leaf_hashes: list[bytes]) -> bytes:

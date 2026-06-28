@@ -7,5 +7,5 @@ import json
 
 def canonical_json(obj: object) -> bytes:
     return json.dumps(
-        obj, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+        obj, sort_keys=True, ensure_ascii=False, separators=(",", ":"), allow_nan=False
     ).encode("utf-8")

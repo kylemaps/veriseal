@@ -131,6 +131,12 @@ def inspect_mcap(
             for schema, channel, message in windowed:
                 if channel.schema_id not in schema_id_map:
                     if schema is None or channel.schema_id == 0:
+                        if schema is None and channel.schema_id != 0:
+                            console.print(
+                                f"  [yellow]WARNING:[/yellow] no schema object for channel "
+                                f"{channel.topic!r} (schema_id={channel.schema_id});"
+                                " writing as schemaless"
+                            )
                         schema_id_map[channel.schema_id] = 0
                     else:
                         schema_id_map[channel.schema_id] = writer.register_schema(
@@ -151,8 +157,12 @@ def inspect_mcap(
                     channel_id=channel_id_map[channel.id],
                     log_time=message.log_time,
                     data=message.data,
-                    publish_time=message.publish_time,
-                    sequence=message.sequence,
+                    publish_time=(
+                        message.publish_time
+                        if message.publish_time is not None
+                        else message.log_time
+                    ),
+                    sequence=message.sequence if message.sequence is not None else 0,
                 )
 
             writer.finish()
