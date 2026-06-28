@@ -1,6 +1,12 @@
 # veriseal
 
-A CLI that takes a robot/autonomy log (MCAP) and produces a **tamper-evident, independently-verifiable incident package** — so a disinterested party can later prove "this log has not been altered since it was sealed, here is exactly what the machine decided in the incident window."
+For incident investigators and safety teams who need to prove a robot/autonomy log wasn't altered after the fact.
+
+A CLI that seals a robot/autonomy log (MCAP) with an Ed25519 signature and a Bitcoin timestamp (OpenTimestamps), producing a `.seal.json` manifest. A disinterested party can later prove "this log matches a seal made by key K, anchored at time T" — but only if the verifier **pins the signer's key** (`--pubkey`). Without key pinning, a tampered re-seal with a new key still passes.
+
+> **Status:** early v0.1, solo project — seal/verify/inspect work end-to-end; APIs may change. Adversarial feedback welcome — [open an issue](https://github.com/kylemaps/veriseal/issues).
+
+![CI](https://github.com/kylemaps/veriseal/actions/workflows/ci.yml/badge.svg)
 
 ![demo](demo/demo.gif)
 
@@ -8,11 +14,13 @@ A CLI that takes a robot/autonomy log (MCAP) and produces a **tamper-evident, in
 
 ## Install
 
+> **Not on PyPI yet.** Install directly from GitHub:
+
 ```bash
-pip install veriseal
+pip install git+https://github.com/kylemaps/veriseal
 ```
 
-Or from source:
+Or for development:
 
 ```bash
 git clone https://github.com/kylemaps/veriseal.git
@@ -31,9 +39,14 @@ veriseal seal log.mcap --out log.seal.json
 # Seal without OpenTimestamps — fast, fully offline
 veriseal seal log.mcap --no-anchor --out log.seal.json
 
-# Verify integrity
+# Verify integrity (WARNING: without --pubkey the embedded key is trusted unconditionally)
 veriseal verify log.mcap log.seal.json
-# → INTACT — signature valid, 200 messages, root 3f8a2b1c...
+# INTACT — signature valid, 198 messages, root 9bfe72f8a52c5ad5...
+#   WARNING: no --pubkey: trusting the key embedded in the manifest; ...
+
+# Verify and pin the signer's key — the only way to catch a tampered re-seal
+veriseal verify log.mcap log.seal.json --pubkey signer.pub.pem
+# INTACT — signature valid, 198 messages, root 9bfe72f8a52c5ad5...
 
 # Tamper detection — flip one byte in a copy and re-verify
 python -c "
@@ -41,10 +54,15 @@ d = bytearray(open('log.mcap', 'rb').read())
 d[1024] ^= 0xFF
 open('tampered.mcap', 'wb').write(bytes(d))
 "
-veriseal verify tampered.mcap log.seal.json
-# → TAMPERED
+veriseal verify tampered.mcap log.seal.json --pubkey signer.pub.pem
+# TAMPERED
+#   Source digest mismatch
+#     expected 9bfe72f8a52c5ad5...
+#     actual   0816a35ad0908c74...
 #   Merkle root mismatch
-#   MODIFIED  topic='/pose' log_time=1750032001000000000
+#     expected 9bfe72f8a52c5ad5...
+#     actual   3f4a2b1c8e9d6f7a...
+#   MODIFIED  topic='/pose' log_time=1750032000000000000
 
 # Inspect an incident time-window (ISO-8601 or nanoseconds since epoch)
 veriseal inspect log.mcap \
@@ -63,10 +81,10 @@ veriseal inspect log.mcap \
 
 By default, `veriseal seal` submits the signed Merkle root to public Bitcoin calendar servers ([OpenTimestamps](https://opentimestamps.org)). The embedded proof starts as `status: "pending"` and becomes `"confirmed"` once a Bitcoin block includes the Merkle path (~1 hour later).
 
-`veriseal verify` reports anchor status **informationally** — the INTACT/TAMPERED verdict and exit code are unaffected by anchor state:
+`veriseal verify` reports anchor status **informational** — the INTACT/TAMPERED verdict and exit code are unaffected by anchor state unless `--require-anchor` is set:
 
 ```
-INTACT — signature valid, 200 messages, root 3f8a2b1c...
+INTACT — signature valid, 198 messages, root 9bfe72f8a52c5ad5...
   Anchor: pending (not yet Bitcoin-confirmed)
 ```
 
@@ -76,11 +94,17 @@ Skip anchoring for offline workflows or CI:
 veriseal seal log.mcap --no-anchor
 ```
 
+Require a valid anchor (useful in audit pipelines):
+
+```bash
+veriseal verify log.mcap log.seal.json --pubkey signer.pub.pem --require-anchor
+```
+
 ---
 
 ## Threat model
 
-**What it PROVES:** the log has not been altered since it was sealed; the seal was made by a specific key at a specific time; the time is independently anchored (not "trust my clock"). It lets a third party detect and locate tampering.
+**What it PROVES:** this log matches a seal made by key K at time T. "Independently verifiable" requires two things: (1) the verifier knows and pins the signer's public key (`--pubkey`); (2) the anchor is trusted. Without `--pubkey`, a tampered re-seal with a fresh key still passes. Without the anchor, time claims rest only on the sealer's assertion.
 
 **What it does NOT prove:** that the log is a truthful record of physical reality at capture time. A seal cannot un-fabricate data captured falsely. Integrity ≠ veracity.
 
@@ -93,7 +117,7 @@ veriseal seal log.mcap --no-anchor
 ## How it works
 
 1. **Hash** — each MCAP message is domain-separated and SHA-256 hashed: `SHA-256(b"\x00" + b"veriseal-leaf-v1\x00" + len(topic) + topic + log_time + payload)`.
-2. **Merkle tree** — leaves sorted by `(log_time, topic, leaf_hash)` and combined with the [RFC 6962](https://www.rfc-editor.org/rfc/rfc6962) binary Merkle Tree Hash algorithm. Any single-byte change flips the root; the leaf diff pinpoints the exact message.
+2. **Merkle tree** — leaves sorted by `(log_time, topic, leaf_hash)` and combined with the [RFC 6962](https://www.rfc-editor.org/rfc/rfc6962) binary Merkle Tree Hash algorithm. Any single-byte change flips the root; the leaf diff pinpoints the affected (topic, log_time) group.
 3. **Sign** — the manifest (root + all leaves + metadata) is serialized as canonical JSON and signed with Ed25519. The signer's public key is embedded in the manifest.
 4. **Anchor** — the signed manifest is SHA-256 hashed and submitted to [OpenTimestamps](https://opentimestamps.org) public calendars. A Bitcoin block later commits to it, providing a trustless timestamp no single party (including the sealer) can backdate.
 
@@ -110,6 +134,7 @@ seal     ingest MCAP → hash every message → RFC 6962 Merkle tree →
 verify   recompute Merkle tree from MCAP → check signature → compare roots →
          INTACT or TAMPERED (locate modified/added/removed messages)
          informational: anchor status (pending / confirmed / invalid)
+         optional: --pubkey to pin the signer's key, --require-anchor to enforce anchor
 
 inspect  filter MCAP to time window → print chronological event timeline →
          export window as incident.mcap (openable in Foxglove Studio)
@@ -121,14 +146,15 @@ inspect  filter MCAP to time window → print chronological event timeline →
 
 ```bash
 cd demo
-python make_sample.py          # generates sample.mcap (synthetic AV log, ~200 msgs)
+python make_sample.py          # generates sample.mcap (synthetic AV log, ~198 msgs)
 bash demo.sh                   # seal → verify INTACT → tamper → verify TAMPERED → inspect
 ```
 
-To record `demo.gif` using [VHS](https://github.com/charmbracelet/vhs):
+To record `demo.gif` using [VHS](https://github.com/charmbracelet/vhs) (requires Docker):
 
 ```bash
-vhs demo/demo.tape
+docker build -f Dockerfile.vhs -t veriseal-vhs .
+docker run --rm -v "$(pwd):/vhs" veriseal-vhs demo/demo.tape
 ```
 
 ---
