@@ -8,11 +8,21 @@ This document specifies the `.seal.json` manifest format produced by `veriseal s
 
 ## 1. Canonical JSON encoding
 
-All JSON serialization in this spec uses **canonical JSON**: object keys sorted lexicographically, no insignificant whitespace, UTF-8 encoded. In Python:
+All JSON serialization in this spec uses **canonical JSON** with the following normative rules:
+
+- Object keys sorted lexicographically (`sort_keys=True`)
+- No insignificant whitespace (`separators=(",", ":")`)
+- Non-ASCII characters encoded as-is, not escaped (`ensure_ascii=False`)
+- NaN and Infinity are forbidden (`allow_nan=False`)
+- Output encoded as UTF-8
+
+In Python:
 
 ```python
-json.dumps(obj, sort_keys=True, separators=(",", ":")).encode("utf-8")
+json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")
 ```
+
+> **Note:** This is NOT RFC 8785 (JCS). JCS requires Unicode escape sequences for certain code points and has additional constraints not present here.
 
 ---
 
@@ -49,17 +59,19 @@ The **Merkle Tree Hash (MTH)** is computed recursively:
 
 ```
 MTH([])     = SHA-256(b"")
-MTH([h])    = h
+MTH([h])    = h                    ← single leaf: root equals the leaf hash (already hashed)
 MTH(D[n])   = SHA-256( b"\x01" + MTH(D[:k]) + MTH(D[k:]) )
 ```
 
 where `k` is the largest power of two strictly less than `n`:
 
 ```python
-k = 1 << (n - 1).bit_length() - 1
+k = 1 << ((n - 1).bit_length() - 1)
 ```
 
 `b"\x01"` is the RFC 6962 domain separator for internal nodes.
+
+> **Note:** Input leaves are **already hashed** (the `0x00`-prefixed leaf hashes from §2). `MTH([h])` returns `h` directly without double-hashing.
 
 ---
 
@@ -82,7 +94,7 @@ This commits to: `schema_version`, `tool_version`, `created_utc`, `source`, `mes
 {
   // ── Identity ────────────────────────────────────────────────────────────────
   "schema_version": "veriseal-manifest-v1",   // literal — identifies this spec
-  "tool_version": "0.1.0.dev0",               // semver of the sealing tool
+  "tool_version": "0.1.1.dev0",               // semver of the sealing tool
 
   "created_utc": "2026-06-24T04:44:08Z",      // ISO 8601, UTC, second precision, Z suffix
 
