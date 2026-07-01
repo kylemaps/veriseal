@@ -100,6 +100,10 @@ Require a valid anchor (useful in audit pipelines):
 veriseal verify log.mcap log.seal.json --pubkey signer.pub.pem --require-anchor
 ```
 
+### ROS 1 rosbags
+
+veriseal seals MCAP; it doesn't read ROS 1 `.bag` directly. Convert first, then seal — see [docs/ros1.md](docs/ros1.md).
+
 ---
 
 ## Threat model
