@@ -68,7 +68,7 @@ def seal(
         except Exception as exc:
             console.print(
                 f"[bold yellow]WARNING:[/bold yellow] OpenTimestamps anchor failed "
-                f"(network unavailable?) — anchor stays null. {exc}"
+                f"(network unavailable?): anchor stays null. {exc}"
             )
             # manifest["anchor"] already = None from build_manifest
 

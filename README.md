@@ -2,9 +2,9 @@
 
 For incident investigators and safety teams who need to prove a robot/autonomy log wasn't altered after the fact.
 
-A CLI that seals a robot/autonomy log (MCAP) with an Ed25519 signature and a Bitcoin timestamp (OpenTimestamps), producing a `.seal.json` manifest. A disinterested party can later prove "this log matches a seal made by key K, anchored at time T" — but only if the verifier **pins the signer's key** (`--pubkey`). Without key pinning, a tampered re-seal with a new key still passes.
+A CLI that seals a robot/autonomy log (MCAP) with an Ed25519 signature and a Bitcoin timestamp (OpenTimestamps), producing a `.seal.json` manifest. A disinterested party can later prove "this log matches a seal made by key K, anchored at time T", but only if the verifier **pins the signer's key** (`--pubkey`). Without key pinning, a tampered re-seal with a new key still passes.
 
-> **Status:** early v0.1, solo project — seal/verify/inspect work end-to-end; APIs may change. Adversarial feedback welcome — [open an issue](https://github.com/kylemaps/veriseal/issues).
+> **Status:** early v0.1, solo project: seal/verify/inspect work end-to-end, but APIs may change. Adversarial feedback welcome: [open an issue](https://github.com/kylemaps/veriseal/issues).
 
 ![CI](https://github.com/kylemaps/veriseal/actions/workflows/ci.yml/badge.svg)
 
@@ -36,32 +36,52 @@ pip install -e .
 # Seal a log (generates a fresh key; submits Merkle root to OpenTimestamps by default)
 veriseal seal log.mcap --out log.seal.json
 
-# Seal without OpenTimestamps — fast, fully offline
+# Seal without OpenTimestamps, fast, fully offline
 veriseal seal log.mcap --no-anchor --out log.seal.json
 
 # Verify integrity (WARNING: without --pubkey the embedded key is trusted unconditionally)
 veriseal verify log.mcap log.seal.json
-# INTACT — signature valid, 198 messages, root 9bfe72f8a52c5ad5...
+# INTACT: signature valid, 198 messages, root 9bfe72f8a52c5ad5...
 #   WARNING: no --pubkey: trusting the key embedded in the manifest; ...
 
-# Verify and pin the signer's key — the only way to catch a tampered re-seal
+# Verify and pin the signer's key: the only way to catch a tampered re-seal
 veriseal verify log.mcap log.seal.json --pubkey signer.pub.pem
-# INTACT — signature valid, 198 messages, root 9bfe72f8a52c5ad5...
+# INTACT: signature valid, 198 messages, root 9bfe72f8a52c5ad5...
 
-# Tamper detection — flip one byte in a copy and re-verify
+# Tamper detection: flip one byte inside a decoded message and re-verify.
+# MCAP messages are chunk-compressed, so flipping a raw file byte usually
+# breaks decompression outright rather than cleanly changing one message;
+# decode first, flip, re-encode (see demo/tamper.py for the same approach).
 python -c "
-d = bytearray(open('log.mcap', 'rb').read())
-d[1024] ^= 0xFF
-open('tampered.mcap', 'wb').write(bytes(d))
+from mcap.reader import make_reader
+from mcap.writer import Writer
+
+rows, schemas, channels, flipped = [], {}, {}, False
+with open('log.mcap', 'rb') as f:
+    rows = list(make_reader(f).iter_messages())
+with open('tampered.mcap', 'wb') as f:
+    w = Writer(f); w.start()
+    for sc, ch, m in rows:
+        schemas.setdefault(ch.schema_id, 0 if (sc is None or ch.schema_id == 0) else
+            w.register_schema(name=sc.name, encoding=sc.encoding, data=sc.data))
+        channels.setdefault(ch.id, w.register_channel(
+            topic=ch.topic, message_encoding=ch.message_encoding,
+            schema_id=schemas[ch.schema_id], metadata=ch.metadata))
+        data = m.data
+        if ch.topic == '/pose' and not flipped:
+            data, flipped = bytes([m.data[0] ^ 0xFF]) + m.data[1:], True
+        w.add_message(channel_id=channels[ch.id], log_time=m.log_time,
+                       data=data, publish_time=m.publish_time, sequence=m.sequence)
+    w.finish()
 "
 veriseal verify tampered.mcap log.seal.json --pubkey signer.pub.pem
 # TAMPERED
 #   Source digest mismatch
-#     expected 9bfe72f8a52c5ad5...
-#     actual   0816a35ad0908c74...
+#     expected 79d83f92510271e5...
+#     actual   5e73e3ba4abc6267...
 #   Merkle root mismatch
 #     expected 9bfe72f8a52c5ad5...
-#     actual   3f4a2b1c8e9d6f7a...
+#     actual   0816a35ad0908c74...
 #   MODIFIED  topic='/pose' log_time=1750032000000000000
 
 # Inspect an incident time-window (ISO-8601 or nanoseconds since epoch)
@@ -81,10 +101,10 @@ veriseal inspect log.mcap \
 
 By default, `veriseal seal` submits the signed Merkle root to public Bitcoin calendar servers ([OpenTimestamps](https://opentimestamps.org)). The embedded proof starts as `status: "pending"` and becomes `"confirmed"` once a Bitcoin block includes the Merkle path (~1 hour later).
 
-`veriseal verify` reports anchor status **informational** — the INTACT/TAMPERED verdict and exit code are unaffected by anchor state unless `--require-anchor` is set:
+`veriseal verify` reports anchor status **informational**: the INTACT/TAMPERED verdict and exit code are unaffected by anchor state unless `--require-anchor` is set:
 
 ```
-INTACT — signature valid, 198 messages, root 9bfe72f8a52c5ad5...
+INTACT: signature valid, 198 messages, root 9bfe72f8a52c5ad5...
   Anchor: pending (not yet Bitcoin-confirmed)
 ```
 
@@ -102,7 +122,7 @@ veriseal verify log.mcap log.seal.json --pubkey signer.pub.pem --require-anchor
 
 ### ROS 1 rosbags
 
-veriseal seals MCAP; it doesn't read ROS 1 `.bag` directly. Convert first, then seal — see [docs/ros1.md](docs/ros1.md).
+veriseal seals MCAP; it doesn't read ROS 1 `.bag` directly. Convert first, then seal: see [docs/ros1.md](docs/ros1.md).
 
 ---
 
@@ -114,18 +134,18 @@ veriseal seals MCAP; it doesn't read ROS 1 `.bag` directly. Convert first, then 
 
 **Where neutrality actually comes from:** sealing as early as possible (ideally at/near capture) and anchoring the root in a public append-only log, so no single party (including the custodian) can backdate or alter it. The closer the seal is to capture and the more public the anchor, the more "neutral" the evidence.
 
-> **Content vs bytes:** `verify` checks message **content**, not file bytes — a losslessly re-muxed MCAP with identical messages still verifies INTACT. `source.sha256` is the separate strict byte-level check, reported alongside the Merkle result.
+> **Content vs bytes:** `verify` checks message **content**, not file bytes: a losslessly re-muxed MCAP with identical messages still verifies INTACT. `source.sha256` is the separate strict byte-level check, reported alongside the Merkle result.
 
 ---
 
 ## How it works
 
-1. **Hash** — each MCAP message is domain-separated and SHA-256 hashed: `SHA-256(b"\x00" + b"veriseal-leaf-v1\x00" + len(topic) + topic + log_time + payload)`.
-2. **Merkle tree** — leaves sorted by `(log_time, topic, leaf_hash)` and combined with the [RFC 6962](https://www.rfc-editor.org/rfc/rfc6962) binary Merkle Tree Hash algorithm. Any single-byte change flips the root; the leaf diff pinpoints the affected (topic, log_time) group.
-3. **Sign** — the manifest (root + all leaves + metadata) is serialized as canonical JSON and signed with Ed25519. The signer's public key is embedded in the manifest.
-4. **Anchor** — the signed manifest is SHA-256 hashed and submitted to [OpenTimestamps](https://opentimestamps.org) public calendars. A Bitcoin block later commits to it, providing a trustless timestamp no single party (including the sealer) can backdate.
+1. **Hash**: each MCAP message is domain-separated and SHA-256 hashed: `SHA-256(b"\x00" + b"veriseal-leaf-v1\x00" + len(topic) + topic + log_time + payload)`.
+2. **Merkle tree**: leaves sorted by `(log_time, topic, leaf_hash)` and combined with the [RFC 6962](https://www.rfc-editor.org/rfc/rfc6962) binary Merkle Tree Hash algorithm. Any single-byte change flips the root; the leaf diff pinpoints the affected (topic, log_time) group.
+3. **Sign**: the manifest (root + all leaves + metadata) is serialized as canonical JSON and signed with Ed25519. The signer's public key is embedded in the manifest.
+4. **Anchor**: the signed manifest is SHA-256 hashed and submitted to [OpenTimestamps](https://opentimestamps.org) public calendars. A Bitcoin block later commits to it, providing a trustless timestamp no single party (including the sealer) can backdate.
 
-The `.seal.json` format is fully documented in **[SPEC-manifest.md](SPEC-manifest.md)** — a conforming verifier needs only that document, the MCAP, and standard crypto libraries.
+The `.seal.json` format is fully documented in **[SPEC-manifest.md](SPEC-manifest.md)**: a conforming verifier needs only that document, the MCAP, and standard crypto libraries.
 
 ---
 

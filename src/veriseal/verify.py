@@ -139,17 +139,17 @@ def verify_seal(
 
     if overall_ok:
         console.print(
-            f"[bold green]INTACT[/bold green] — signature valid, "
+            f"[bold green]INTACT[/bold green]: signature valid, "
             f"{n} messages, root {root_hex[:16]}..."
         )
     else:
         console.print("[bold red]TAMPERED[/bold red]")
         if not pubkey_ok:
             console.print(
-                "  [red]Signer key mismatch — manifest was not signed by the pinned key[/red]"
+                "  [red]Signer key mismatch: manifest was not signed by the pinned key[/red]"
             )
         if not sig_ok:
-            console.print("  [red]Signature INVALID — manifest may have been altered[/red]")
+            console.print("  [red]Signature INVALID: manifest may have been altered[/red]")
         if not source_ok:
             console.print(
                 f"  [red]Source digest mismatch[/red]\n"
@@ -165,7 +165,7 @@ def verify_seal(
         if modifications or removals or additions:
             if not sig_ok:
                 console.print(
-                    "  [dim](tamper localisation is untrusted — manifest signature invalid)[/dim]"
+                    "  [dim](tamper localisation is untrusted: manifest signature invalid)[/dim]"
                 )
             for topic, log_time in modifications:
                 console.print(f"  [yellow]MODIFIED[/yellow]  topic={topic!r} log_time={log_time}")
@@ -187,8 +187,8 @@ def verify_seal(
     anchor = manifest.get("anchor")
     if require_anchor and (anchor is None or anchor.get("type") not in ("opentimestamps",)):
         console.print(
-            "[bold red]Anchor: ABSENT[/bold red] — "
-            "--require-anchor set but no valid anchor in manifest"
+            "[bold red]Anchor: ABSENT[/bold red] "
+            "(--require-anchor set but no valid anchor in manifest)"
         )
         anchor_fail = True
     elif anchor and anchor.get("type") == "opentimestamps":
@@ -213,7 +213,7 @@ def _check_anchor(manifest: dict, anchor: dict) -> bool:
 
         if expected_digest.hex() != anchor.get("commits", ""):
             console.print(
-                "  [bold red]Anchor: INVALID[/bold red] — proof does not commit to this manifest"
+                "  [bold red]Anchor: INVALID[/bold red] (proof does not commit to this manifest)"
             )
             return False
 
@@ -232,5 +232,5 @@ def _check_anchor(manifest: dict, anchor: dict) -> bool:
         return True
 
     except Exception as exc:
-        console.print(f"  [bold red]Anchor: ERROR[/bold red] — {exc}")
+        console.print(f"  [bold red]Anchor: ERROR[/bold red]: {exc}")
         return False
