@@ -32,11 +32,11 @@ def parse_time(s: str) -> int:
         dt = datetime.fromisoformat(s)
     except ValueError:
         raise ValueError(
-            f"Cannot parse time {s!r} — use ns-since-epoch integer or ISO-8601 UTC "
+            f"Cannot parse time {s!r}: use ns-since-epoch integer or ISO-8601 UTC "
             "(e.g. 2024-01-01T12:00:00Z)"
         ) from None
     if dt.tzinfo is None:
-        raise ValueError(f"Timestamp {s!r} has no timezone — suffix with Z or +00:00")
+        raise ValueError(f"Timestamp {s!r} has no timezone: suffix with Z or +00:00")
     # Integer arithmetic to avoid float multiplication; preserves microsecond precision.
     delta = dt - _EPOCH
     return (
@@ -95,7 +95,7 @@ def inspect_mcap(
 
     # ── Timeline table ────────────────────────────────────────────────────────
     table = Table(
-        title=f"Window [{from_ns} ns, {to_ns} ns]  —  {len(windowed)} message(s)",
+        title=f"Window [{from_ns} ns, {to_ns} ns]: {len(windowed)} message(s)",
         show_lines=False,
     )
     table.add_column("#", justify="right", style="dim", no_wrap=True)
