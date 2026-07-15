@@ -4,3 +4,4 @@ sample.mcap
 sample.seal.json
 tampered.mcap
 *.incident.mcap
+incident-pack/

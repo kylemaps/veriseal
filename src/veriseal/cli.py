@@ -64,6 +64,35 @@ def verify(
 
 
 @app.command()
+def pack(
+    path: Path = typer.Argument(..., help="Path to the sealed .mcap file."),
+    seal_json: Path = typer.Argument(
+        ..., help="Path to the .seal.json manifest.", metavar="PATH.seal.json"
+    ),
+    out: Path = typer.Option(
+        ..., "--out", "-o", help="Output directory for the incident-evidence bundle."
+    ),
+    pubkey: Path | None = typer.Option(
+        None,
+        "--pubkey",
+        help="Pin the expected signer's Ed25519 public key (PEM) when building the report.",
+    ),
+) -> None:
+    """Build a portable, independently re-verifiable incident-evidence bundle."""
+    from veriseal.pack import build_pack
+
+    result = build_pack(path, seal_json, out, pubkey_path=pubkey)
+    if result.ok:
+        console.print(f"[bold green]Pack written[/bold green]: {result.out_dir}  (INTACT)")
+    else:
+        console.print(
+            f"[bold yellow]Pack written[/bold yellow]: {result.out_dir}  "
+            "([bold red]verification FAILED[/bold red] — see report.txt)"
+        )
+    raise typer.Exit(code=0 if result.ok else 1)
+
+
+@app.command()
 def inspect(
     path: Path = typer.Argument(..., help="Path to the .mcap file to inspect."),
     from_time: str = typer.Option(..., "--from", help="Window start: ns-since-epoch or ISO-8601."),

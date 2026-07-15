@@ -95,6 +95,9 @@ veriseal inspect log.mcap \
     --from 2025-06-16T00:00:01Z \
     --to   2025-06-16T00:00:04Z \
     --out  incident.mcap
+
+# Build a portable, independently re-verifiable incident-evidence bundle
+veriseal pack log.mcap log.seal.json --out incident-pack/
 ```
 
 ### OpenTimestamps anchor
@@ -131,6 +134,16 @@ The whole point of the seal is that *someone who trusts neither the operator nor
 ### Foxglove panel
 
 [`veriseal-panel/`](veriseal-panel/) is a [Foxglove Studio](https://foxglove.dev) extension that checks a seal **in-workflow**, without leaving your visualization. Open a log, load its `.seal.json`, and a live badge reports **SEALED & AUTHENTIC** or **SEAL INVALID** — verifying the signature and Merkle root against the signer's Ed25519 key. (Whole-file byte integrity stays the CLI/web-verifier's job, since a panel only sees decoded messages, never the raw file bytes.) The panel's verification core is the same logic as the web verifier and is tested against the Python reference.
+
+### Incident-evidence pack
+
+`veriseal pack` bundles an already-sealed log into a portable, self-contained evidence package: the manifest, a plain-English verification report, the OpenTimestamps proof (if any, with its honest pending/confirmed state), an offline copy of the [web verifier](web/verify.html), and a cover sheet explaining what the seal proves — and doesn't. It re-runs the exact same verification `veriseal verify` performs (one code path, two renderings), so the report can never drift from what the CLI would say.
+
+```bash
+veriseal pack log.mcap log.seal.json --out incident-pack/
+```
+
+The pack is evidence infrastructure, not a compliance certificate: it supports disclosure obligations under things like the EU Product Liability Directive (2024/2853) or AI Act Article 73 by making a log's integrity independently checkable, but it never asserts the log's *contents* are true, and it never claims to satisfy any regulation on its own.
 
 ---
 

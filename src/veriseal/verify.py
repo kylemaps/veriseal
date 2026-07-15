@@ -1,4 +1,11 @@
-"""veriseal verify command — recompute and check a sealed MCAP."""
+"""veriseal verify — recompute and check a sealed MCAP.
+
+The verification logic lives in `run_verification()`, which returns a structured
+`VerificationResult` with no I/O or presentation. `verify_seal()` (the CLI entry
+point) and `veriseal.pack` both call it, so there is exactly one verification
+code path — the CLI's Rich console output and the incident-pack report are two
+renderings of the same result, never two computations.
+"""
 
 from __future__ import annotations
 
@@ -6,6 +13,7 @@ import base64
 import hashlib
 import json
 from collections import Counter, defaultdict
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from cryptography.hazmat.primitives.serialization import (
@@ -33,75 +41,93 @@ def _build_multiset(entries: list[tuple[str, int, str]]) -> _Multiset:
     return dict(result)
 
 
-def verify_seal(
+@dataclass
+class AnchorResult:
+    """Outcome of checking the manifest's embedded OpenTimestamps proof, if any."""
+
+    present: bool = False
+    commits_ok: bool | None = None
+    status: str | None = None  # "pending" | "confirmed"
+    block_height: int | None = None
+    error: str | None = None
+
+
+@dataclass
+class VerificationResult:
+    """Structured outcome of verifying an MCAP against a .seal.json manifest.
+
+    Pure data: no console output. `ok` is the same INTACT/TAMPERED verdict the
+    CLI exit code encodes (0 iff `ok and not anchor_required_but_failed`).
+    """
+
+    manifest: dict
+    mcap_path: Path
+    actual_sha256: str
+    actual_size: int
+    source_ok: bool
+    sig_ok: bool
+    pubkey_ok: bool
+    pubkey_pinned: bool
+    recomputed_root: str
+    root_ok: bool
+    modifications: list[tuple[str, int]] = field(default_factory=list)
+    removals: list[tuple[str, int]] = field(default_factory=list)
+    additions: list[tuple[str, int]] = field(default_factory=list)
+    anchor: AnchorResult = field(default_factory=AnchorResult)
+
+    @property
+    def intact(self) -> bool:
+        return self.sig_ok and self.root_ok
+
+    @property
+    def ok(self) -> bool:
+        return self.intact and self.pubkey_ok
+
+
+def run_verification(
     mcap_path: Path,
-    seal_path: Path,
+    manifest: dict,
     pubkey_path: Path | None = None,
-    require_anchor: bool = False,
-) -> int:
+) -> VerificationResult:
+    """Recompute and check *manifest* against *mcap_path*. Pure — no console output.
+
+    Raises on I/O or parse errors (unreadable MCAP, unreadable --pubkey file);
+    callers decide how to present those as CLI errors vs. pack failures.
     """
-    Verify *mcap_path* against *seal_path*.
-
-    Returns:
-        0  — INTACT (signature valid AND Merkle root matches AND pubkey/anchor checks pass)
-        1  — TAMPERED, key mismatch, or anchor required but absent/invalid
-        2  — usage / parse error
-    """
-    try:
-        manifest = json.loads(seal_path.read_bytes())
-    except Exception as exc:
-        console.print(f"[bold red]ERROR:[/bold red] Cannot read manifest: {exc}")
-        return 2
-
-    # ── Source file digest (gross check) ─────────────────────────────────────
-    try:
-        actual_sha256, actual_size = file_digest(mcap_path)
-    except Exception as exc:
-        console.print(f"[bold red]ERROR:[/bold red] Cannot read MCAP: {exc}")
-        return 2
-
+    actual_sha256, actual_size = file_digest(mcap_path)
     source_ok = (
         actual_sha256 == manifest["source"]["sha256"]
         and actual_size == manifest["source"]["size_bytes"]
     )
 
     # ── Signature check ───────────────────────────────────────────────────────
+    pub_pem_str = manifest["signature"]["public_key"]
     try:
         payload_dict = {k: v for k, v in manifest.items() if k not in ("signature", "anchor")}
         signed_payload = canonical_json(payload_dict)
-        pub_pem_str = manifest["signature"]["public_key"]
         sig_bytes = bytes.fromhex(manifest["signature"]["value"])
         sig_ok = ed25519_verify(pub_pem_str, signed_payload, sig_bytes)
     except Exception:
         sig_ok = False
 
     # ── Pubkey pin check ─────────────────────────────────────────────────────
+    pubkey_pinned = pubkey_path is not None
     pubkey_ok = True
     if pubkey_path is not None:
-        try:
-            expected_key = load_pem_public_key(pubkey_path.read_bytes())
-            manifest_key = load_pem_public_key(pub_pem_str.encode())
-            raw_expected = expected_key.public_bytes(Encoding.Raw, PublicFormat.Raw)
-            raw_manifest = manifest_key.public_bytes(Encoding.Raw, PublicFormat.Raw)
-            pubkey_ok = raw_expected == raw_manifest
-        except Exception as exc:
-            console.print(f"[bold red]ERROR:[/bold red] Cannot load --pubkey: {exc}")
-            return 2
+        expected_key = load_pem_public_key(pubkey_path.read_bytes())
+        manifest_key = load_pem_public_key(pub_pem_str.encode())
+        raw_expected = expected_key.public_bytes(Encoding.Raw, PublicFormat.Raw)
+        raw_manifest = manifest_key.public_bytes(Encoding.Raw, PublicFormat.Raw)
+        pubkey_ok = raw_expected == raw_manifest
 
     # ── Recompute leaves from MCAP ────────────────────────────────────────────
-    try:
-        raw_messages = list(iter_messages(mcap_path))
-    except Exception as exc:
-        console.print(f"[bold red]ERROR:[/bold red] Cannot parse MCAP: {exc}")
-        return 2
-
+    raw_messages = list(iter_messages(mcap_path))
     recomputed_entries = [
         (topic, log_time, leaf_hash(topic, log_time, payload).hex())
         for topic, log_time, payload in raw_messages
     ]
     manifest_entries = [
-        (leaf["topic"], leaf["log_time"], leaf["leaf_hash"])
-        for leaf in manifest["leaves"]
+        (leaf["topic"], leaf["log_time"], leaf["leaf_hash"]) for leaf in manifest["leaves"]
     ]
 
     # ── Recompute Merkle root (same sort as seal) ─────────────────────────────
@@ -130,48 +156,114 @@ def verify_seal(
         else:
             additions.append(key)
 
-    intact = sig_ok and root_ok
-    overall_ok = intact and pubkey_ok
+    # ── Anchor check (informational) ──────────────────────────────────────────
+    anchor_result = AnchorResult()
+    anchor = manifest.get("anchor")
+    if anchor and anchor.get("type") == "opentimestamps":
+        anchor_result.present = True
+        try:
+            payload_for_anchor = {k: v for k, v in manifest.items() if k != "anchor"}
+            expected_digest = hashlib.sha256(canonical_json(payload_for_anchor)).digest()
+
+            if expected_digest.hex() != anchor.get("commits", ""):
+                anchor_result.commits_ok = False
+            else:
+                anchor_result.commits_ok = True
+                from veriseal import anchor as anchor_mod
+
+                ots_bytes = base64.b64decode(anchor["ots_base64"])
+                status, block_height = anchor_mod.verify_anchor(expected_digest, ots_bytes)
+                anchor_result.status = status
+                anchor_result.block_height = block_height
+        except Exception as exc:
+            anchor_result.error = str(exc)
+
+    return VerificationResult(
+        manifest=manifest,
+        mcap_path=mcap_path,
+        actual_sha256=actual_sha256,
+        actual_size=actual_size,
+        source_ok=source_ok,
+        sig_ok=sig_ok,
+        pubkey_ok=pubkey_ok,
+        pubkey_pinned=pubkey_pinned,
+        recomputed_root=recomputed_root,
+        root_ok=root_ok,
+        modifications=modifications,
+        removals=removals,
+        additions=additions,
+        anchor=anchor_result,
+    )
+
+
+def verify_seal(
+    mcap_path: Path,
+    seal_path: Path,
+    pubkey_path: Path | None = None,
+    require_anchor: bool = False,
+) -> int:
+    """
+    Verify *mcap_path* against *seal_path* and print a Rich report.
+
+    Returns:
+        0  — INTACT (signature valid AND Merkle root matches AND pubkey/anchor checks pass)
+        1  — TAMPERED, key mismatch, or anchor required but absent/invalid
+        2  — usage / parse error
+    """
+    try:
+        manifest = json.loads(seal_path.read_bytes())
+    except Exception as exc:
+        console.print(f"[bold red]ERROR:[/bold red] Cannot read manifest: {exc}")
+        return 2
+
+    try:
+        result = run_verification(mcap_path, manifest, pubkey_path)
+    except FileNotFoundError as exc:
+        console.print(f"[bold red]ERROR:[/bold red] Cannot read MCAP: {exc}")
+        return 2
+    except Exception as exc:
+        console.print(f"[bold red]ERROR:[/bold red] {exc}")
+        return 2
 
     # ── Rich output ───────────────────────────────────────────────────────────
     n = manifest["messages"]["count"]
     root_hex = manifest["merkle"]["root"]
 
-    if overall_ok:
+    if result.ok:
         console.print(
             f"[bold green]INTACT[/bold green]: signature valid, "
             f"{n} messages, root {root_hex[:16]}..."
         )
     else:
         console.print("[bold red]TAMPERED[/bold red]")
-        if not pubkey_ok:
+        if not result.pubkey_ok:
             console.print(
                 "  [red]Signer key mismatch: manifest was not signed by the pinned key[/red]"
             )
-        if not sig_ok:
+        if not result.sig_ok:
             console.print("  [red]Signature INVALID: manifest may have been altered[/red]")
-        if not source_ok:
+        if not result.source_ok:
             console.print(
                 f"  [red]Source digest mismatch[/red]\n"
                 f"    expected {manifest['source']['sha256'][:16]}...\n"
-                f"    actual   {actual_sha256[:16]}..."
+                f"    actual   {result.actual_sha256[:16]}..."
             )
-        if not root_ok:
+        if not result.root_ok:
             console.print(
                 f"  [red]Merkle root mismatch[/red]\n"
                 f"    expected {manifest['merkle']['root'][:16]}...\n"
-                f"    actual   {recomputed_root[:16]}..."
+                f"    actual   {result.recomputed_root[:16]}..."
             )
-        if modifications or removals or additions:
-            if not sig_ok:
+        if result.modifications or result.removals or result.additions:
+            if not result.sig_ok:
                 console.print(
                     "  [dim](tamper localisation is untrusted: manifest signature invalid)[/dim]"
                 )
-            for topic, log_time in modifications:
+            for topic, log_time in result.modifications:
                 console.print(f"  [yellow]MODIFIED[/yellow]  topic={topic!r} log_time={log_time}")
-            for topic, log_time in removals:
+            for topic, log_time in result.removals:
                 console.print(f"  [yellow]REMOVED[/yellow]   topic={topic!r} log_time={log_time}")
-            for topic, log_time in additions:
+            for topic, log_time in result.additions:
                 console.print(f"  [yellow]ADDED[/yellow]     topic={topic!r} log_time={log_time}")
 
     # ── No-pubkey warning ─────────────────────────────────────────────────────
@@ -182,7 +274,7 @@ def verify_seal(
             "Pin the signer's key for real assurance."
         )
 
-    # ── Anchor check ─────────────────────────────────────────────────────────
+    # ── Anchor report ─────────────────────────────────────────────────────────
     anchor_fail = False
     anchor = manifest.get("anchor")
     if require_anchor and (anchor is None or anchor.get("type") not in ("opentimestamps",)):
@@ -191,46 +283,23 @@ def verify_seal(
             "(--require-anchor set but no valid anchor in manifest)"
         )
         anchor_fail = True
-    elif anchor and anchor.get("type") == "opentimestamps":
-        anchor_valid = _check_anchor(manifest, anchor)
-        if require_anchor and not anchor_valid:
-            anchor_fail = True
-
-    return 0 if (overall_ok and not anchor_fail) else 1
-
-
-def _check_anchor(manifest: dict, anchor: dict) -> bool:
-    """
-    Verify the anchor and print status.
-
-    Returns True if the anchor commits to the correct manifest digest and the OTS
-    proof is parseable (pending or confirmed).  Returns False if commits mismatch
-    or the proof cannot be verified.
-    """
-    try:
-        payload_for_anchor = {k: v for k, v in manifest.items() if k != "anchor"}
-        expected_digest = hashlib.sha256(canonical_json(payload_for_anchor)).digest()
-
-        if expected_digest.hex() != anchor.get("commits", ""):
+    elif result.anchor.present:
+        a = result.anchor
+        if a.error is not None:
+            console.print(f"  [bold red]Anchor: ERROR[/bold red]: {a.error}")
+            if require_anchor:
+                anchor_fail = True
+        elif a.commits_ok is False:
             console.print(
                 "  [bold red]Anchor: INVALID[/bold red] (proof does not commit to this manifest)"
             )
-            return False
-
-        from veriseal import anchor as anchor_mod
-
-        ots_bytes = base64.b64decode(anchor["ots_base64"])
-        status, block_height = anchor_mod.verify_anchor(expected_digest, ots_bytes)
-
-        if status == "confirmed":
+            if require_anchor:
+                anchor_fail = True
+        elif a.status == "confirmed":
             console.print(
-                f"  [bold green]Anchor: confirmed[/bold green] (Bitcoin block #{block_height})"
+                f"  [bold green]Anchor: confirmed[/bold green] (Bitcoin block #{a.block_height})"
             )
         else:
             console.print("  [cyan]Anchor: pending[/cyan] (not yet Bitcoin-confirmed)")
 
-        return True
-
-    except Exception as exc:
-        console.print(f"  [bold red]Anchor: ERROR[/bold red]: {exc}")
-        return False
+    return 0 if (result.ok and not anchor_fail) else 1
