@@ -157,8 +157,15 @@ async function internalNode(left: Bytes, right: Bytes): Promise<Bytes> {
   prefix[0] = 0x01;
   return await sha256(concat(prefix, left, right));
 }
+/**
+ * Largest power of two strictly less than n (RFC 6962 §2.1), i.e. Python's
+ * `1 << ((n - 1).bit_length() - 1)`. Must be exact integer math: Math.log2 can
+ * return a value a hair under the true integer for large n (e.g. n-1 a power of
+ * two), flooring to one less and picking the wrong split — which produces a
+ * DIFFERENT (wrong) Merkle root on a perfectly genuine seal.
+ */
 function largestPow2Below(n: number): number {
-  return 1 << Math.floor(Math.log2(n - 1));
+  return 1 << (31 - Math.clz32(n - 1));
 }
 async function merkleRoot(leafHashes: Bytes[]): Promise<Bytes> {
   const n = leafHashes.length;
@@ -202,9 +209,9 @@ async function verifySignature(manifest: SealManifest): Promise<{ ok: boolean; e
   return { ok };
 }
 
-async function recomputeMerkleRoot(manifest: SealManifest): Promise<string> {
-  // sort leaves by (log_time, topic, leaf_hash) ascending — same as seal
-  const leaves = manifest.leaves.slice().sort((a, b) => {
+function sortLeaves(leaves: readonly SealLeaf[]): SealLeaf[] {
+  // sort by (log_time, topic, leaf_hash) ascending — same as seal
+  return leaves.slice().sort((a, b) => {
     const at = BigInt(a.log_time);
     const bt = BigInt(b.log_time);
     if (at < bt) {return -1;}
@@ -213,8 +220,17 @@ async function recomputeMerkleRoot(manifest: SealManifest): Promise<string> {
     if (a.topic > b.topic) {return 1;}
     return a.leaf_hash < b.leaf_hash ? -1 : a.leaf_hash > b.leaf_hash ? 1 : 0;
   });
-  const hashes = leaves.map((l) => hexToBytes(l.leaf_hash));
+}
+
+/** Recompute the RFC 6962 Merkle root over a manifest's leaves (sorted, then hex root). */
+export async function merkleRootFromLeaves(leaves: readonly SealLeaf[]): Promise<string> {
+  const sorted = sortLeaves(leaves);
+  const hashes = sorted.map((l) => hexToBytes(l.leaf_hash));
   return bytesToHex(await merkleRoot(hashes));
+}
+
+async function recomputeMerkleRoot(manifest: SealManifest): Promise<string> {
+  return await merkleRootFromLeaves(manifest.leaves);
 }
 
 const EMPTY_RESULT: SealCheckResult = {

@@ -50,9 +50,8 @@ writeFileSync(
 );
 execSync(`npx tsc -p "${tsconfig}"`, { cwd: root, stdio: "inherit" });
 
-const { checkSeal, parseManifestPreservingBigInts, crossCheckShape } = await import(
-  "file://" + join(out, "sealcore.js").replace(/\\/g, "/")
-);
+const { checkSeal, parseManifestPreservingBigInts, crossCheckShape, merkleRootFromLeaves } =
+  await import("file://" + join(out, "sealcore.js").replace(/\\/g, "/"));
 
 const sealText = readFileSync(join(here, "fixtures/sample.seal.json"), "utf8");
 
@@ -86,6 +85,19 @@ check("non-manifest input rejected", !bad.ok && typeof bad.error === "string");
 // 6. Coverage cross-check.
 const shape = crossCheckShape(manifest, { topics: new Set(["/pose", "/status", "/extra"]) });
 check("crossCheckShape flags unsealed topic", shape.extraTopics.join(",") === "/extra");
+
+// 7. Large leaf count (1237 leaves — not a power of two, well above the small
+// fixture size). Regression test for the RFC 6962 split-point bug: an earlier
+// version computed the split with `1 << Math.floor(Math.log2(n - 1))`, which can
+// diverge from Python's exact `1 << ((n-1).bit_length() - 1)` and silently
+// produces a DIFFERENT (wrong) root on a genuine seal. Root below was computed by
+// the Python reference (src/veriseal/merkle.py) over the same leaves.
+const large = JSON.parse(readFileSync(join(here, "fixtures/large-leaves.json"), "utf8"));
+const largeRoot = await merkleRootFromLeaves(large.leaves);
+check(
+  `large leaf count (n=${large.leaves.length}) root matches Python`,
+  largeRoot === large.root,
+);
 
 rmSync(out, { recursive: true, force: true });
 
