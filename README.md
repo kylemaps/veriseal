@@ -124,6 +124,10 @@ veriseal verify log.mcap log.seal.json --pubkey signer.pub.pem --require-anchor
 
 veriseal seals MCAP; it doesn't read ROS 1 `.bag` directly. Convert first, then seal: see [docs/ros1.md](docs/ros1.md).
 
+### Independent web verifier
+
+The whole point of the seal is that *someone who trusts neither the operator nor veriseal* can still check it. [`web/verify.html`](web/verify.html) is a single self-contained page that does exactly that: drop an `.mcap` and its `.seal.json`, and it recomputes the Ed25519 signature, the RFC 6962 Merkle root, and the SHA-256 file digest **entirely in the browser** (WebCrypto, no network calls, nothing uploaded). Open the file locally, or host it anywhere static. An insurer or investigator can verify a sealed log on their own machine without installing anything.
+
 ---
 
 ## Threat model
