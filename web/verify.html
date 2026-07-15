@@ -1,0 +1,610 @@
+<title>veriseal — independent verifier</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f7f8fa;
+    --panel: #ffffff;
+    --panel-2: #f0f2f5;
+    --ink: #12161c;
+    --ink-2: #4a5563;
+    --ink-3: #7b8694;
+    --line: #dfe3e9;
+    --line-strong: #c6ccd6;
+    --accent: #2b7fb8;
+    --ok: #128a5b;
+    --ok-bg: #e4f5ee;
+    --bad: #c8353a;
+    --bad-bg: #fbe8e8;
+    --warn: #a9701c;
+    --warn-bg: #fbf1df;
+    --idle: #7b8694;
+    --mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1116;
+      --panel: #161b22;
+      --panel-2: #1c222b;
+      --ink: #e7ecf2;
+      --ink-2: #a4afbd;
+      --ink-3: #6f7b8a;
+      --line: #262d38;
+      --line-strong: #333c48;
+      --accent: #58a6d8;
+      --ok: #35c98a;
+      --ok-bg: #10261e;
+      --bad: #f0555a;
+      --bad-bg: #2a1417;
+      --warn: #e0a13c;
+      --warn-bg: #291f10;
+      --idle: #6f7b8a;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f7f8fa; --panel: #ffffff; --panel-2: #f0f2f5;
+    --ink: #12161c; --ink-2: #4a5563; --ink-3: #7b8694;
+    --line: #dfe3e9; --line-strong: #c6ccd6; --accent: #2b7fb8;
+    --ok: #128a5b; --ok-bg: #e4f5ee; --bad: #c8353a; --bad-bg: #fbe8e8;
+    --warn: #a9701c; --warn-bg: #fbf1df; --idle: #7b8694;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1116; --panel: #161b22; --panel-2: #1c222b;
+    --ink: #e7ecf2; --ink-2: #a4afbd; --ink-3: #6f7b8a;
+    --line: #262d38; --line-strong: #333c48; --accent: #58a6d8;
+    --ok: #35c98a; --ok-bg: #10261e; --bad: #f0555a; --bad-bg: #2a1417;
+    --warn: #e0a13c; --warn-bg: #291f10; --idle: #6f7b8a;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  header { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .logo {
+    font-family: var(--mono); font-weight: 600; font-size: 20px;
+    letter-spacing: -0.01em; color: var(--ink);
+  }
+  .logo .seal { color: var(--accent); }
+  .tag {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.09em;
+    color: var(--ink-3); border: 1px solid var(--line-strong);
+    padding: 3px 8px; border-radius: 20px;
+  }
+  .lede {
+    margin: 18px 0 4px; font-size: 16px; color: var(--ink-2);
+    max-width: 62ch; text-wrap: pretty;
+  }
+  .lede strong { color: var(--ink); font-weight: 600; }
+
+  .neutrality {
+    margin-top: 22px; padding: 14px 16px; border-radius: var(--radius);
+    background: var(--panel-2); border: 1px solid var(--line);
+    font-size: 13.5px; color: var(--ink-2); display: flex; gap: 12px;
+  }
+  .neutrality .k { color: var(--accent); font-weight: 700; flex: none; }
+
+  .drops { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 26px; }
+  @media (max-width: 620px) { .drops { grid-template-columns: 1fr; } }
+
+  .drop {
+    position: relative; border: 1.5px dashed var(--line-strong);
+    border-radius: var(--radius); background: var(--panel);
+    padding: 18px 16px; cursor: pointer; transition: border-color .15s, background .15s;
+    display: flex; flex-direction: column; gap: 6px; min-height: 96px;
+  }
+  .drop:hover, .drop:focus-within { border-color: var(--accent); }
+  .drop.dragover { border-color: var(--accent); background: var(--panel-2); }
+  .drop.loaded { border-style: solid; border-color: var(--line-strong); }
+  .drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .drop .role {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.09em;
+    color: var(--ink-3); font-weight: 600;
+  }
+  .drop .hint { font-size: 14px; color: var(--ink-2); }
+  .drop .fname {
+    font-family: var(--mono); font-size: 13px; color: var(--ink);
+    word-break: break-all;
+  }
+  .drop .meta { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+  .drop.loaded .role { color: var(--accent); }
+
+  /* Verdict */
+  .verdict {
+    margin-top: 26px; border-radius: 14px; border: 1px solid var(--line);
+    background: var(--panel); overflow: hidden;
+  }
+  .verdict-head {
+    padding: 26px 24px; display: flex; align-items: center; gap: 18px;
+    border-bottom: 1px solid var(--line); transition: background .2s;
+  }
+  .badge {
+    flex: none; width: 54px; height: 54px; border-radius: 50%;
+    display: grid; place-items: center; font-size: 26px; font-weight: 700;
+    border: 2px solid currentColor;
+  }
+  .verdict-title { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+  .verdict-sub { font-size: 14px; color: var(--ink-2); margin-top: 2px; }
+
+  .state-idle .verdict-head { background: var(--panel); }
+  .state-idle .badge { color: var(--idle); }
+  .state-idle .verdict-title { color: var(--ink-2); }
+
+  .state-ok .verdict-head { background: var(--ok-bg); }
+  .state-ok .badge { color: var(--ok); }
+  .state-ok .verdict-title { color: var(--ok); }
+
+  .state-bad .verdict-head { background: var(--bad-bg); }
+  .state-bad .badge { color: var(--bad); }
+  .state-bad .verdict-title { color: var(--bad); }
+
+  .state-warn .verdict-head { background: var(--warn-bg); }
+  .state-warn .badge { color: var(--warn); }
+  .state-warn .verdict-title { color: var(--warn); }
+
+  /* Checks */
+  .checks { padding: 8px 24px 20px; }
+  .check {
+    display: grid; grid-template-columns: 22px 1fr; gap: 12px;
+    padding: 14px 0; border-bottom: 1px solid var(--line);
+  }
+  .check:last-child { border-bottom: none; }
+  .check .mark { font-size: 15px; line-height: 1.4; }
+  .check.pass .mark { color: var(--ok); }
+  .check.fail .mark { color: var(--bad); }
+  .check.skip .mark { color: var(--idle); }
+  .check.info .mark { color: var(--accent); }
+  .check .name { font-weight: 600; font-size: 14.5px; }
+  .check .desc { font-size: 13px; color: var(--ink-2); margin-top: 2px; }
+  .check .kv {
+    font-family: var(--mono); font-size: 12px; color: var(--ink-3);
+    margin-top: 6px; display: grid; gap: 2px;
+    overflow-x: auto;
+  }
+  .check .kv .row { white-space: nowrap; }
+  .check .kv .lbl { color: var(--ink-3); display: inline-block; min-width: 74px; }
+  .check .kv .val { color: var(--ink-2); }
+  .check .kv .val.bad { color: var(--bad); }
+  .check .kv .val.good { color: var(--ok); }
+
+  .findings { margin-top: 10px; display: grid; gap: 4px; }
+  .finding {
+    font-family: var(--mono); font-size: 12.5px; padding: 6px 10px;
+    border-radius: 6px; background: var(--bad-bg); color: var(--bad);
+    border: 1px solid transparent;
+  }
+  .finding.mod { }
+
+  .actions { display: flex; gap: 12px; margin-top: 22px; flex-wrap: wrap; align-items: center; }
+  button.reset {
+    font-family: var(--sans); font-size: 13px; color: var(--ink-2);
+    background: var(--panel); border: 1px solid var(--line-strong);
+    padding: 8px 14px; border-radius: 8px; cursor: pointer;
+  }
+  button.reset:hover { border-color: var(--accent); color: var(--ink); }
+  .sample-note { font-size: 12.5px; color: var(--ink-3); }
+  .sample-note a { color: var(--accent); cursor: pointer; text-decoration: none; }
+  .sample-note a:hover { text-decoration: underline; }
+
+  footer {
+    margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line);
+    font-size: 12.5px; color: var(--ink-3); display: grid; gap: 6px;
+  }
+  footer code { font-family: var(--mono); color: var(--ink-2); }
+  footer a { color: var(--accent); text-decoration: none; }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="logo">veri<span class="seal">seal</span></span>
+    <span class="tag">independent verifier</span>
+  </header>
+
+  <p class="lede">
+    Drop a sealed log (<strong>.mcap</strong>) and its <strong>.seal.json</strong> manifest.
+    This page recomputes the signature, the Merkle root, and the file digest
+    <strong>entirely in your browser</strong> &mdash; nothing is uploaded.
+  </p>
+
+  <div class="neutrality">
+    <span class="k">Why this matters</span>
+    <span>You are checking the evidence yourself, without trusting the operator who produced
+    the log or the tool that sealed it. If this page says <strong>VERIFIED</strong>, the log
+    matches a seal made by a specific Ed25519 key &mdash; and you proved it on your own machine.</span>
+  </div>
+
+  <div class="drops">
+    <label class="drop" id="drop-mcap">
+      <span class="role">Sealed log</span>
+      <span class="hint">Drop <b>.mcap</b> here or click to choose</span>
+      <input type="file" id="file-mcap" accept=".mcap,application/octet-stream">
+    </label>
+    <label class="drop" id="drop-seal">
+      <span class="role">Seal manifest</span>
+      <span class="hint">Drop <b>.seal.json</b> here or click to choose</span>
+      <input type="file" id="file-seal" accept=".json,application/json">
+    </label>
+  </div>
+
+  <section class="verdict state-idle" id="verdict" aria-live="polite">
+    <div class="verdict-head">
+      <div class="badge" id="badge">&middot;</div>
+      <div>
+        <div class="verdict-title" id="v-title">Awaiting evidence</div>
+        <div class="verdict-sub" id="v-sub">Load both files to run verification.</div>
+      </div>
+    </div>
+    <div class="checks" id="checks"></div>
+  </section>
+
+  <div class="actions">
+    <button class="reset" id="reset" type="button">Clear</button>
+    <button class="reset" id="tamper" type="button" style="display:none">Tamper a byte &amp; re-verify</button>
+    <span class="sample-note">No files handy? <a id="load-sample">Load a sample sealed log</a> to see a pass, then tamper it live.</span>
+  </div>
+
+  <footer>
+    <div>Verification runs client-side with the WebCrypto API (Ed25519 + SHA-256). Open the source: this file has no network calls.</div>
+    <div><b>Signature</b> &mdash; the manifest is authentic to its Ed25519 key. <b>Merkle root</b> &mdash; the listed message hashes fold to the signed root. <b>File digest</b> &mdash; the log's bytes match what was sealed; any change flips this.</div>
+    <div>To pin a signer you already trust, compare the key fingerprint shown on a VERIFIED result against the one you hold out-of-band.</div>
+  </footer>
+</div>
+
+<script>
+"use strict";
+
+/* ---- state ---- */
+const state = { mcap: null, seal: null, mcapName: null, sealName: null };
+
+/* ---- canonical JSON: must byte-match veriseal.canonical.canonical_json ----
+   Python: json.dumps(obj, sort_keys=True, ensure_ascii=False,
+                       separators=(",", ":"), allow_nan=False)
+   We reproduce: sorted object keys, no whitespace, UTF-8, ints kept exact. */
+function canonicalize(value) {
+  if (value === null) return "null";
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new Error("non-finite number");
+    return String(value);
+  }
+  if (typeof value === "bigint") return value.toString();
+  if (typeof value === "string") return JSON.stringify(value);
+  if (Array.isArray(value)) return "[" + value.map(canonicalize).join(",") + "]";
+  if (typeof value === "object") {
+    const keys = Object.keys(value).sort();
+    return "{" + keys.map(k => JSON.stringify(k) + ":" + canonicalize(value[k])).join(",") + "}";
+  }
+  throw new Error("cannot canonicalize " + typeof value);
+}
+
+/* Large integers (log_time in ns) exceed Number safety. Parse the raw JSON
+   text preserving them as BigInt so canonical bytes match Python exactly. */
+function parseSealPreservingBigInts(text) {
+  // Wrap bare large integers as BigInt via a reviver-free manual pass:
+  // JSON.parse loses precision, so we tag long integer literals first.
+  const tagged = text.replace(
+    /:(\s*)(-?\d{16,})(\s*[,}\]])/g,
+    (m, s1, num, tail) => `:${s1}"__BIGINT__${num}"${tail}`
+  );
+  const obj = JSON.parse(tagged);
+  const revive = (v) => {
+    if (typeof v === "string" && v.startsWith("__BIGINT__")) return BigInt(v.slice(10));
+    if (Array.isArray(v)) return v.map(revive);
+    if (v && typeof v === "object") { for (const k in v) v[k] = revive(v[k]); return v; }
+    return v;
+  };
+  return revive(obj);
+}
+
+/* ---- hex / base64 helpers ---- */
+function hexToBytes(hex) {
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.substr(i * 2, 2), 16);
+  return out;
+}
+function bytesToHex(buf) {
+  const b = new Uint8Array(buf); let s = "";
+  for (let i = 0; i < b.length; i++) s += b[i].toString(16).padStart(2, "0");
+  return s;
+}
+function pemToDer(pem) {
+  const body = pem.replace(/-----[^-]+-----/g, "").replace(/\s+/g, "");
+  const bin = atob(body);
+  const der = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) der[i] = bin.charCodeAt(i);
+  return der;
+}
+
+/* ---- Merkle (RFC 6962), mirrors veriseal.merkle ---- */
+async function sha256(bytes) {
+  return new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+}
+function concat(...arrs) {
+  let n = 0; for (const a of arrs) n += a.length;
+  const out = new Uint8Array(n); let o = 0;
+  for (const a of arrs) { out.set(a, o); o += a.length; }
+  return out;
+}
+async function internalNode(left, right) {
+  return sha256(concat(new Uint8Array([0x01]), left, right));
+}
+function largestPow2Below(n) { return 1 << (Math.floor(Math.log2(n - 1))); }
+async function merkleRoot(leafHashes) {
+  const n = leafHashes.length;
+  if (n === 0) return sha256(new Uint8Array(0));
+  if (n === 1) return leafHashes[0];
+  const k = largestPow2Below(n);
+  const [l, r] = await Promise.all([
+    merkleRoot(leafHashes.slice(0, k)),
+    merkleRoot(leafHashes.slice(k)),
+  ]);
+  return internalNode(l, r);
+}
+
+/* ---- verification ---- */
+async function verifySignature(manifest) {
+  const payload = {};
+  for (const k of Object.keys(manifest)) {
+    if (k !== "signature" && k !== "anchor") payload[k] = manifest[k];
+  }
+  const msg = new TextEncoder().encode(canonicalize(payload));
+  const sig = hexToBytes(manifest.signature.value);
+  const der = pemToDer(manifest.signature.public_key);
+  let key;
+  try {
+    key = await crypto.subtle.importKey("spki", der, { name: "Ed25519" }, false, ["verify"]);
+  } catch (e) {
+    return { ok: false, error: "This browser lacks WebCrypto Ed25519 support. Use a recent Chrome, Edge, or Safari." };
+  }
+  const ok = await crypto.subtle.verify({ name: "Ed25519" }, key, sig, msg);
+  return { ok };
+}
+
+function keyFingerprint(pem) {
+  // short human fingerprint = last 16 hex of the raw key bytes (tail of SPKI DER)
+  const der = pemToDer(pem);
+  const raw = der.slice(der.length - 32);
+  return bytesToHex(raw);
+}
+
+async function recomputeMerkle(manifest) {
+  // sort leaves by (log_time, topic, leaf_hash) — same as seal
+  const leaves = manifest.leaves.slice().sort((a, b) => {
+    if (a.log_time < b.log_time) return -1;
+    if (a.log_time > b.log_time) return 1;
+    if (a.topic < b.topic) return -1;
+    if (a.topic > b.topic) return 1;
+    return a.leaf_hash < b.leaf_hash ? -1 : a.leaf_hash > b.leaf_hash ? 1 : 0;
+  });
+  const hashes = leaves.map(l => hexToBytes(l.leaf_hash));
+  const root = await merkleRoot(hashes);
+  return bytesToHex(root);
+}
+
+async function runVerification() {
+  if (!state.mcap || !state.seal) { render({ status: "idle" }); return; }
+
+  let manifest;
+  try {
+    manifest = parseSealPreservingBigInts(new TextDecoder().decode(state.seal));
+  } catch (e) {
+    render({ status: "bad", parseError: "The seal manifest is not valid JSON." });
+    return;
+  }
+  if (!manifest.signature || !manifest.merkle || !manifest.source || !manifest.leaves) {
+    render({ status: "bad", parseError: "This JSON is not a veriseal manifest (missing signature/merkle/source/leaves)." });
+    return;
+  }
+
+  const result = { checks: [], manifest };
+
+  // 1. signature
+  const sigRes = await verifySignature(manifest);
+  if (sigRes.error) { render({ status: "warn", cryptoError: sigRes.error }); return; }
+  result.sigOk = sigRes.ok;
+  result.fingerprint = keyFingerprint(manifest.signature.public_key);
+
+  // 2. merkle root recompute
+  const recomputedRoot = await recomputeMerkle(manifest);
+  result.rootOk = recomputedRoot === manifest.merkle.root;
+  result.recomputedRoot = recomputedRoot;
+
+  // 3. file digest
+  const digest = bytesToHex(await sha256(state.mcap));
+  result.fileOk = digest === manifest.source.sha256 && state.mcap.length === manifest.source.size_bytes;
+  result.actualDigest = digest;
+  result.actualSize = state.mcap.length;
+
+  result.intact = result.sigOk && result.rootOk && result.fileOk;
+  render({ status: result.intact ? "ok" : "bad", result });
+}
+
+/* ---- rendering ---- */
+const el = (id) => document.getElementById(id);
+
+function render(view) {
+  const verdict = el("verdict");
+  const badge = el("badge");
+  const title = el("v-title");
+  const sub = el("v-sub");
+  const checks = el("checks");
+  checks.innerHTML = "";
+
+  verdict.className = "verdict state-" + (view.status || "idle");
+
+  if (view.status === "idle") {
+    badge.textContent = "·";
+    title.textContent = "Awaiting evidence";
+    sub.textContent = state.mcap ? "Now load the .seal.json manifest."
+                    : state.seal ? "Now load the .mcap log."
+                    : "Load both files to run verification.";
+    return;
+  }
+  if (view.parseError || view.cryptoError) {
+    badge.textContent = view.cryptoError ? "!" : "✗";
+    title.textContent = view.cryptoError ? "Cannot verify" : "Not a valid seal";
+    sub.textContent = view.parseError || view.cryptoError;
+    return;
+  }
+
+  const r = view.result;
+  if (view.status === "ok") {
+    badge.textContent = "✓";
+    title.textContent = "VERIFIED";
+    sub.innerHTML = `Independently verifiable &middot; signed by key <code style="font-family:var(--mono)">${r.fingerprint.slice(0,16)}…</code> &middot; ${r.manifest.messages.count} messages`;
+  } else {
+    badge.textContent = "✗";
+    title.textContent = "TAMPERED";
+    sub.textContent = "This log does not match its seal. Details below.";
+  }
+
+  // check rows
+  checks.appendChild(checkRow(
+    r.sigOk, "Manifest signature",
+    r.sigOk ? "The seal is authentic to its Ed25519 key." : "Signature INVALID — the manifest itself was altered.",
+    [["key", r.fingerprint.slice(0,32) + "…", null],
+     ["alg", "Ed25519", null]]
+  ));
+
+  checks.appendChild(checkRow(
+    r.rootOk, "Merkle root",
+    r.rootOk ? "All listed message hashes fold to the signed root." : "The message-hash tree does not fold to the signed root.",
+    [["signed", short(r.manifest.merkle.root), null],
+     ["computed", short(r.recomputedRoot), r.rootOk ? "good" : "bad"]]
+  ));
+
+  checks.appendChild(checkRow(
+    r.fileOk, "File digest",
+    r.fileOk ? "The log's bytes are exactly what was sealed." : "The log's bytes differ from what was sealed — the file changed.",
+    [["sealed", short(r.manifest.source.sha256), null],
+     ["actual", short(r.actualDigest), r.fileOk ? "good" : "bad"],
+     ["size", r.actualSize + " B" + (r.actualSize === r.manifest.source.size_bytes ? "" : " (sealed " + r.manifest.source.size_bytes + " B)"),
+        r.actualSize === r.manifest.source.size_bytes ? null : "bad"]]
+  ));
+
+  // anchor (informational)
+  const anchor = r.manifest.anchor;
+  if (anchor && anchor.type === "opentimestamps") {
+    checks.appendChild(checkRow("info", "Timestamp anchor",
+      "An OpenTimestamps proof is embedded (Bitcoin-anchored time). Confirm depth with the veriseal CLI.",
+      [["type", "opentimestamps", null]]));
+  } else {
+    checks.appendChild(checkRow("skip", "Timestamp anchor",
+      "No anchor in this manifest — time rests on the sealer's assertion.", []));
+  }
+
+  if (!r.intact) {
+    const note = document.createElement("div");
+    note.className = "check fail";
+    note.innerHTML = `<span class="mark">✗</span><div><div class="name">What this means</div><div class="desc">A VERIFIED result requires all three checks to pass. Because one failed, do not treat this log as evidence — it was modified after sealing, or the wrong file/manifest pair was loaded.</div></div>`;
+    checks.appendChild(note);
+  }
+}
+
+function short(hex) { return hex.slice(0, 24) + "…" + hex.slice(-8); }
+
+function checkRow(status, name, desc, kvs) {
+  const cls = status === true ? "pass" : status === false ? "fail" : status;
+  const div = document.createElement("div");
+  div.className = "check " + cls;
+  const mark = status === true ? "✓" : status === false ? "✗"
+             : status === "info" ? "◉" : "○";
+  let kvHtml = "";
+  if (kvs && kvs.length) {
+    kvHtml = '<div class="kv">' + kvs.map(([l, v, cls2]) =>
+      `<div class="row"><span class="lbl">${l}</span><span class="val ${cls2||""}">${v}</span></div>`).join("") + "</div>";
+  }
+  div.innerHTML = `<span class="mark">${mark}</span><div><div class="name">${name}</div><div class="desc">${desc}</div>${kvHtml}</div>`;
+  return div;
+}
+
+/* ---- file wiring ---- */
+function wireDrop(dropId, inputId, kind) {
+  const drop = el(dropId), input = el(inputId);
+  const onFile = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const bytes = new Uint8Array(reader.result);
+      if (kind === "mcap") { state.mcap = bytes; state.mcapName = file.name; }
+      else { state.seal = bytes; state.sealName = file.name; }
+      markLoaded(drop, kind, file.name, bytes.length);
+      runVerification();
+    };
+    reader.readAsArrayBuffer(file);
+  };
+  input.addEventListener("change", (e) => onFile(e.target.files[0]));
+  ["dragover", "dragenter"].forEach(ev => drop.addEventListener(ev, (e) => {
+    e.preventDefault(); drop.classList.add("dragover");
+  }));
+  ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, (e) => {
+    e.preventDefault(); drop.classList.remove("dragover");
+  }));
+  drop.addEventListener("drop", (e) => onFile(e.dataTransfer.files[0]));
+}
+
+function markLoaded(drop, kind, name, size) {
+  drop.classList.add("loaded");
+  const role = kind === "mcap" ? "Sealed log" : "Seal manifest";
+  drop.innerHTML = `<span class="role">${role}</span>` +
+    `<span class="fname">${name}</span>` +
+    `<span class="meta">${(size/1024).toFixed(1)} KB &middot; loaded</span>` +
+    drop.querySelector("input").outerHTML;
+  // re-wire the freshly written input
+  wireDrop(drop.id, drop.querySelector("input").id, kind);
+}
+
+wireDrop("drop-mcap", "file-mcap", "mcap");
+wireDrop("drop-seal", "file-seal", "seal");
+
+el("reset").addEventListener("click", () => location.reload());
+
+/* ---- theme toggle passthrough already handled by tokens ---- */
+
+/* ---- sample loader: an embedded, self-contained sealed pair ---- */
+el("load-sample").addEventListener("click", async () => {
+  const s = window.__SAMPLE__;
+  if (!s) return;
+  state.mcap = hexToBytes(s.mcapHex);
+  state.seal = new TextEncoder().encode(s.sealJson);
+  markLoaded(el("drop-mcap"), "mcap", "sample.mcap", state.mcap.length);
+  markLoaded(el("drop-seal"), "seal", "sample.seal.json", state.seal.length);
+  el("tamper").style.display = "";
+  await runVerification();
+});
+
+el("tamper").addEventListener("click", async () => {
+  if (!state.mcap) return;
+  // Flip the first byte of a message payload: the ASCII "nav_ok step=0" status
+  // string. Mirrors the CLI tamper demo — a single-byte change to real content.
+  const needle = new TextEncoder().encode("nav_ok step=0");
+  let idx = -1;
+  outer: for (let i = 0; i < state.mcap.length - needle.length; i++) {
+    for (let j = 0; j < needle.length; j++) if (state.mcap[i + j] !== needle[j]) continue outer;
+    idx = i; break;
+  }
+  const flipAt = idx >= 0 ? idx + needle.length - 1 : Math.floor(state.mcap.length / 2);
+  state.mcap = state.mcap.slice();
+  state.mcap[flipAt] ^= 0xff;
+  el("drop-mcap").querySelector(".meta").textContent =
+    (state.mcap.length / 1024).toFixed(1) + " KB · 1 byte flipped @ offset " + flipAt;
+  await runVerification();
+});
+</script>
+<script>
+window.__SAMPLE__ = {
+  mcapHex: "894d434150300d0a011a0000000000000004000000726f73320e000000726f73626167732d302e31312e3306540700000000000000002a36fe9c97170084014efe9c97172c0700000000000000000000000000002c0700000000000003460300000000000001001d00000067656f6d657472795f6d7367732f6d73672f506f73655374616d70656407000000726f73326d7367140300007374645f6d7367732f486561646572206865616465720a67656f6d657472795f6d7367732f506f736520706f73650a3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d0a4d53473a207374645f6d7367732f4865616465720a6275696c74696e5f696e74657266616365732f54696d65207374616d700a737472696e67206672616d655f69640a3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d0a4d53473a206275696c74696e5f696e74657266616365732f54696d650a696e743332207365630a75696e743332206e616e6f7365630a3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d0a4d53473a2067656f6d657472795f6d7367732f506f73650a67656f6d657472795f6d7367732f506f696e7420706f736974696f6e0a67656f6d657472795f6d7367732f5175617465726e696f6e206f7269656e746174696f6e0a3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d0a4d53473a2067656f6d657472795f6d7367732f506f696e740a666c6f6174363420780a666c6f6174363420790a666c6f61743634207a0a3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d0a4d53473a2067656f6d657472795f6d7367732f5175617465726e696f6e0a666c6f6174363420780a666c6f6174363420790a666c6f61743634207a0a666c6f6174363420770a04360000000000000001000100050000002f706f7365030000006364721e000000140000006f6666657265645f716f735f70726f66696c6573020000005b5d0334000000000000000200130000007374645f6d7367732f6d73672f537472696e6707000000726f73326d73670c000000737472696e6720646174610a04380000000000000002000200070000002f737461747573030000006364721e000000140000006f6666657265645f716f735f70726f66696c6573020000005b5d05620000000000000001000000000000002a36fe9c971700002a36fe9c97170001000000f1536500000000040000006d617000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000f03f052c0000000000000002000000000000002a36fe9c971700002a36fe9c9717000100000e0000006e61765f6f6b20737465703d300005620000000000000001000000000000e11f3cfe9c971700e11f3cfe9c97170001000000f1536500e1f505040000006d617000000000000000f03f00000000000000400000000000000000000000000000000000000000000000000000000000000000000000000000f03f052c0000000000000002000000000000e11f3cfe9c971700e11f3cfe9c9717000100000e0000006e61765f6f6b20737465703d310005620000000000000001000000000000c21542fe9c971700c21542fe9c97170001000000f1536500c2eb0b040000006d617000000000000000004000000000000010400000000000000000000000000000000000000000000000000000000000000000000000000000f03f052c0000000000000002000000000000c21542fe9c971700c21542fe9c9717000100000e0000006e61765f6f6b20737465703d320005620000000000000001000000000000a30b48fe9c971700a30b48fe9c97170001000000f1536500a3e111040000006d617000000000000000084000000000000018400000000000000000000000000000000000000000000000000000000000000000000000000000f03f052c0000000000000002000000000000a30b48fe9c971700a30b48fe9c9717000100000e0000006e61765f6f6b20737465703d33000562000000000000000100000000000084014efe9c97170084014efe9c97170001000000f153650084d717040000006d617000000000000000104000000000000020400000000000000000000000000000000000000000000000000000000000000000000000000000f03f052c000000000000000200000000000084014efe9c97170084014efe9c9717000100000e0000006e61765f6f6b20737465703d340007560000000000000001005000000000002a36fe9c97170c0400000000000000e11f3cfe9c9717ac0400000000000000c21542fe9c97174c0500000000000000a30b48fe9c9717ec050000000000000084014efe9c97178c0600000000000007560000000000000002005000000000002a36fe9c9717770400000000000000e11f3cfe9c9717170500000000000000c21542fe9c9717b70500000000000000a30b48fe9c971757060000000000000084014efe9c9717f7060000000000000cf80300000000000007000000726f7362616732e90300001300000073657269616c697a65645f6d65746164617461ce030000636f6d7072657373696f6e5f666f726d61743a2027270a636f6d7072657373696f6e5f6d6f64653a2027270a637573746f6d5f646174613a206e756c6c0a6475726174696f6e3a0a20206e616e6f7365636f6e64733a203430303030303030300a66696c65733a0a2d206475726174696f6e3a0a202020206e616e6f7365636f6e64733a203430303030303030300a20206d6573736167655f636f756e743a2031300a2020706174683a2073616d706c655f726f73312e6d6361702e6d6361700a20207374617274696e675f74696d653a0a202020206e616e6f7365636f6e64735f73696e63655f65706f63683a20313730303030303030303030303030303030300a6d6573736167655f636f756e743a2031300a72656c61746976655f66696c655f70617468733a0a2d2073616d706c655f726f73312e6d6361702e6d6361700a726f735f64697374726f3a20726f73626167730a7374617274696e675f74696d653a0a20206e616e6f7365636f6e64735f73696e63655f65706f63683a20313730303030303030303030303030303030300a73746f726167655f6964656e7469666965723a206d6361700a746f706963735f776974685f6d6573736167655f636f756e743a0a2d206d6573736167655f636f756e743a20350a2020746f7069635f6d657461646174613a0a202020206e616d653a202f706f73650a202020206f6666657265645f716f735f70726f66696c65733a205b5d0a2020202073657269616c697a6174696f6e5f666f726d61743a206364720a20202020747970653a2067656f6d657472795f6d7367732f6d73672f506f73655374616d7065640a20202020747970655f6465736372697074696f6e5f686173683a200a2020202020205249485330315f313066333738366437643430666432623534333637383335363134626666383564346164336235646162363262663862636130636332333264373362346364380a2d206d6573736167655f636f756e743a20350a2020746f7069635f6d657461646174613a0a202020206e616d653a202f7374617475730a202020206f6666657265645f716f735f70726f66696c65733a205b5d0a2020202073657269616c697a6174696f6e5f666f726d61743a206364720a20202020747970653a207374645f6d7367732f6d73672f537472696e670a20202020747970655f6465736372697074696f6e5f686173683a200a2020202020205249485330315f646636363863373430343832626264343866623339643736613730646664346264353964623132383830323137343335303332353965393438663662316131380a76657273696f6e3a20390f04000000000000000000000003460300000000000001001d00000067656f6d657472795f6d7367732f6d73672f506f73655374616d70656407000000726f73326d7367140300007374645f6d7367732f486561646572206865616465720a67656f6d657472795f6d7367732f506f736520706f73650a3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d0a4d53473a207374645f6d7367732f4865616465720a6275696c74696e5f696e74657266616365732f54696d65207374616d700a737472696e67206672616d655f69640a3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d0a4d53473a206275696c74696e5f696e74657266616365732f54696d650a696e743332207365630a75696e743332206e616e6f7365630a3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d0a4d53473a2067656f6d657472795f6d7367732f506f73650a67656f6d657472795f6d7367732f506f696e7420706f736974696f6e0a67656f6d657472795f6d7367732f5175617465726e696f6e206f7269656e746174696f6e0a3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d0a4d53473a2067656f6d657472795f6d7367732f506f696e740a666c6f6174363420780a666c6f6174363420790a666c6f61743634207a0a3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d0a4d53473a2067656f6d657472795f6d7367732f5175617465726e696f6e0a666c6f6174363420780a666c6f6174363420790a666c6f61743634207a0a666c6f6174363420770a0334000000000000000200130000007374645f6d7367732f6d73672f537472696e6707000000726f73326d73670c000000737472696e6720646174610a04360000000000000001000100050000002f706f7365030000006364721e000000140000006f6666657265645f716f735f70726f66696c6573020000005b5d04380000000000000002000200070000002f737461747573030000006364721e000000140000006f6666657265645f716f735f70726f66696c6573020000005b5d08540000000000000000002a36fe9c97170084014efe9c97172b000000000000005d0700000000000014000000010088070000000000000200e707000000000000be00000000000000000000002c070000000000002c070000000000000d1b000000000000004608000000000000010400000000000007000000726f73626167320b42000000000000000a0000000000000002000200000000000000010000000100000000002a36fe9c97170084014efe9c97171400000001000500000000000000020005000000000000000e110000000000000003540c0000000000008c030000000000000e110000000000000004e00f00000000000080000000000000000e11000000000000000860100000000000005d000000000000000e11000000000000000dbd1000000000000024000000000000000e11000000000000000be1100000000000004b00000000000000021400000000000000540c0000000000002c1100000000000000000000894d434150300d0a",
+  sealJson: "{\"anchor\":null,\"created_utc\":\"2026-07-01T04:59:35Z\",\"hash_alg\":\"SHA-256\",\"leaves\":[{\"index\":0,\"leaf_hash\":\"0f871af777ff0c2c6cbf249d643ec4028ced0f407316afa43dadb93605275d32\",\"log_time\":1700000000000000000,\"topic\":\"/pose\"},{\"index\":1,\"leaf_hash\":\"5f577c9bc933de957bd58cd1b33a3e630ab3e1b6a013a6d7f6979e695e6e0ef2\",\"log_time\":1700000000000000000,\"topic\":\"/status\"},{\"index\":2,\"leaf_hash\":\"6b85831385874480cd13f25ae2ecaaf14d1e5e8005e61611f250034e7d215b3f\",\"log_time\":1700000000100000000,\"topic\":\"/pose\"},{\"index\":3,\"leaf_hash\":\"16058431c2ef143fe5447678fce3e8a13b79efa8a977d58195ca285c54bf5d61\",\"log_time\":1700000000100000000,\"topic\":\"/status\"},{\"index\":4,\"leaf_hash\":\"e5d972f79f44342aac8852d715c204672229b202df08c65183661d086a610440\",\"log_time\":1700000000200000000,\"topic\":\"/pose\"},{\"index\":5,\"leaf_hash\":\"347b66c166e5f45c72f778085a0f057481e072aa6d717bd77efb3f8947474f92\",\"log_time\":1700000000200000000,\"topic\":\"/status\"},{\"index\":6,\"leaf_hash\":\"7fabb204fc917b61b9de0115127e1c00ae5aefdece3893e9e7877b46d537c3b1\",\"log_time\":1700000000300000000,\"topic\":\"/pose\"},{\"index\":7,\"leaf_hash\":\"becbe6f016d01467c4b18f0cfde5c050e5b49b057b875aa6beb97895934e6506\",\"log_time\":1700000000300000000,\"topic\":\"/status\"},{\"index\":8,\"leaf_hash\":\"48db478d68072249e1f17c75303e9aed8b5d957a3fbb5bce5f2e73e5e559ae3d\",\"log_time\":1700000000400000000,\"topic\":\"/pose\"},{\"index\":9,\"leaf_hash\":\"b169088b6035f0e83e493d6a454241d997fc5211693dbc5a2bb9276aba5d3577\",\"log_time\":1700000000400000000,\"topic\":\"/status\"}],\"merkle\":{\"ordering\":\"log_time,topic,leaf_hash asc\",\"root\":\"9a75174f04a956e947427887468f63381b3914cafbc3f83b052620a2bc04a581\",\"scheme\":\"RFC6962-SHA256\"},\"messages\":{\"count\":10,\"log_time_max\":1700000000400000000,\"log_time_min\":1700000000000000000},\"schema_version\":\"veriseal-manifest-v1\",\"signature\":{\"alg\":\"Ed25519\",\"public_key\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAmSc88GBQYID0NZWBKUcMK3GbJXWFU/AiTSvou0tYIYA=\\n-----END PUBLIC KEY-----\\n\",\"value\":\"3727b015424b684a6db966c5614a2625483fe7ed636aa0b415640bca97d78ffc2abddcfc1de5fb1abc1be556dacb0445d8243c0e7052939118fb5f6fe205e109\"},\"source\":{\"filename\":\"sample_ros1.mcap\",\"sha256\":\"f8e502bce22c7130ccd70aaadef1e651a72296b93a7be9ace6c665e9993d1651\",\"size_bytes\":4563},\"tool_version\":\"0.1.1.dev0\"}"
+};
+</script>
