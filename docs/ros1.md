@@ -10,9 +10,10 @@ veriseal verify drive.bag drive.seal.json        # INTACT
 ```
 
 The bag's messages are hashed as the same `(topic, log_time, payload)` leaves veriseal uses
-for MCAP, so seal / verify / inspect / pack all work identically; the manifest records
+for MCAP, so `seal`, `verify`, and `pack` all work identically; the manifest records
 `"source": { "format": "rosbag1", ... }`. Tamper detection locates the changed message just
-as it does for MCAP.
+as it does for MCAP. (`veriseal inspect`, which exports a time-window as a new MCAP, is
+MCAP-only for now — convert the bag first if you need it.)
 
 Converting to MCAP first (below) is still fine — for example if you want a single MCAP
 artifact to open in Foxglove — but it is no longer required to seal.

@@ -138,7 +138,7 @@ Add one step to your ROS 2 recording workflow so every log is sealed the moment 
 
 ### ROS 1 rosbags and other formats
 
-veriseal hashes `(topic, log_time, payload)` message triples, which aren't MCAP-specific. It seals **MCAP** natively and **ROS 1 `.bag`** directly via the optional `rosbags` reader (pure Python, no ROS install): `pip install "veriseal[ros1]"`, then `veriseal seal drive.bag ...`. Seal / verify / inspect / pack all work the same across formats; the manifest records `source.format`. See [docs/ros1.md](docs/ros1.md).
+veriseal hashes `(topic, log_time, payload)` message triples, which aren't MCAP-specific. It seals **MCAP** natively and **ROS 1 `.bag`** directly via the optional `rosbags` reader (pure Python, no ROS install): `pip install "veriseal[ros1]"`, then `veriseal seal drive.bag ...`. `seal`, `verify`, and `pack` work the same across formats (the manifest records `source.format`); `inspect`'s window export is MCAP-only. See [docs/ros1.md](docs/ros1.md).
 
 ### Independent web verifier
 
