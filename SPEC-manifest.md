@@ -165,9 +165,15 @@ When `--anchor` is used (the default), `"anchor"` is replaced with:
   // "pending" → "confirmed" once a Bitcoin block includes the Merkle path
   "status": "pending",
 
-  "submitted_utc": "2026-06-24T04:44:08Z"    // ISO 8601 UTC time of OTS submission
+  "submitted_utc": "2026-06-24T04:44:08Z",   // ISO 8601 UTC time of OTS submission
+
+  // Present ONLY when status == "confirmed" (added by `veriseal anchor upgrade`):
+  // the Bitcoin block height whose header attests the committed digest.
+  "bitcoin_block_height": 812345
 }
 ```
+
+When `status` is `"pending"`, the `bitcoin_block_height` key is absent. `veriseal anchor upgrade` asks the OpenTimestamps calendars whether the proof has been included in a Bitcoin block; if so, it rewrites `ots_base64` with the upgraded proof, sets `status` to `"confirmed"`, and records `bitcoin_block_height`. It sets `"confirmed"` only when the upgraded proof actually carries a `BitcoinBlockHeaderAttestation`.
 
 **Excluded from signed payload.** The `"anchor"` key is removed before computing the Ed25519 signed payload (§4), so the anchor can be updated (e.g., upgraded from `pending` to `confirmed`) without invalidating the signature.
 

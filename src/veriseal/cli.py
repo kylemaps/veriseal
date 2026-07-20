@@ -12,6 +12,11 @@ app = typer.Typer(
     help="Tamper-evident incident packages for robot/autonomy logs.",
     no_args_is_help=True,
 )
+anchor_app = typer.Typer(
+    help="Inspect and maintain a manifest's OpenTimestamps anchor.",
+    no_args_is_help=True,
+)
+app.add_typer(anchor_app, name="anchor")
 console = Console()
 
 @app.command()
@@ -70,7 +75,13 @@ def pack(
         ..., help="Path to the .seal.json manifest.", metavar="PATH.seal.json"
     ),
     out: Path = typer.Option(
-        ..., "--out", "-o", help="Output directory for the incident-evidence bundle."
+        ...,
+        "--out",
+        "-o",
+        help="Output path for the incident-evidence bundle (dir, or .zip with --zip).",
+    ),
+    zip_: bool = typer.Option(
+        False, "--zip", help="Write a single .zip archive instead of a directory."
     ),
     pubkey: Path | None = typer.Option(
         None,
@@ -81,12 +92,12 @@ def pack(
     """Build a portable, independently re-verifiable incident-evidence bundle."""
     from veriseal.pack import build_pack
 
-    result = build_pack(path, seal_json, out, pubkey_path=pubkey)
+    result = build_pack(path, seal_json, out, pubkey_path=pubkey, as_zip=zip_)
     if result.ok:
-        console.print(f"[bold green]Pack written[/bold green]: {result.out_dir}  (INTACT)")
+        console.print(f"[bold green]Pack written[/bold green]: {result.out}  (INTACT)")
     else:
         console.print(
-            f"[bold yellow]Pack written[/bold yellow]: {result.out_dir}  "
+            f"[bold yellow]Pack written[/bold yellow]: {result.out}  "
             "([bold red]verification FAILED[/bold red] — see report.txt)"
         )
     raise typer.Exit(code=0 if result.ok else 1)
@@ -110,3 +121,63 @@ def inspect(
         console.print(f"[bold red]ERROR:[/bold red] {exc}")
         raise typer.Exit(code=2)
     raise typer.Exit(code=inspect_mcap(path, from_ns, to_ns, topic, out))
+
+
+@anchor_app.command("upgrade")
+def anchor_upgrade(
+    seal_json: Path = typer.Argument(
+        ..., help="Path to the .seal.json manifest to upgrade in place.", metavar="PATH.seal.json"
+    ),
+) -> None:
+    """Check whether a pending OpenTimestamps anchor is now Bitcoin-confirmed.
+
+    Asks the public calendars; if a Bitcoin block now includes the proof, the
+    manifest's anchor block is updated in place (status -> confirmed, block height
+    recorded). The anchor is excluded from the signed payload, so this never
+    invalidates the signature.
+    """
+    import json
+
+    from veriseal.anchor import upgrade_manifest
+    from veriseal.canonical import canonical_json
+
+    try:
+        manifest = json.loads(seal_json.read_bytes())
+    except Exception as exc:
+        console.print(f"[bold red]ERROR:[/bold red] cannot read manifest: {exc}")
+        raise typer.Exit(code=2)
+
+    try:
+        status, height, changed = upgrade_manifest(manifest)
+    except Exception as exc:
+        console.print(f"[bold red]ERROR:[/bold red] upgrade failed: {exc}")
+        raise typer.Exit(code=2)
+
+    if status == "none":
+        console.print(
+            "No OpenTimestamps anchor in this manifest (sealed with --no-anchor). "
+            "Nothing to upgrade."
+        )
+        raise typer.Exit(code=0)
+    if status == "mismatch":
+        console.print(
+            "[bold red]Anchor does not commit to this manifest[/bold red] "
+            "(the manifest was altered, or this is the wrong proof). Not upgrading."
+        )
+        raise typer.Exit(code=1)
+
+    if changed:
+        seal_json.write_bytes(canonical_json(manifest))
+
+    if status == "confirmed":
+        console.print(
+            f"[bold green]Anchor confirmed[/bold green] in Bitcoin block #{height}. "
+            + ("Manifest updated." if changed else "Manifest already recorded this.")
+        )
+    else:
+        suffix = " Proof refreshed." if changed else ""
+        console.print(
+            "[cyan]Anchor still pending[/cyan] (not yet in a Bitcoin block; "
+            "confirmation typically takes a few hours). Try again later." + suffix
+        )
+    raise typer.Exit(code=0)

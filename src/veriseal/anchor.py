@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
+
 from opentimestamps.calendar import RemoteCalendar
 from opentimestamps.core.notary import BitcoinBlockHeaderAttestation, PendingAttestation
 from opentimestamps.core.op import OpSHA256
 from opentimestamps.core.serialize import BytesDeserializationContext, BytesSerializationContext
 from opentimestamps.core.timestamp import DetachedTimestampFile, Timestamp
+
+from veriseal.canonical import canonical_json
 
 _CALENDARS = [
     "https://a.pool.opentimestamps.org",
@@ -85,3 +90,49 @@ def upgrade(ots_bytes: bytes) -> bytes:
     new_ctx = BytesSerializationContext()
     dtf.serialize(new_ctx)
     return new_ctx.getbytes()
+
+
+def upgrade_manifest(manifest: dict) -> tuple[str, int | None, bool]:
+    """Upgrade a manifest's embedded OpenTimestamps proof in place (network).
+
+    Asks the calendars whether the pending proof is now included in a Bitcoin
+    block. The anchor block is EXCLUDED from the signed payload, so updating it
+    never invalidates the manifest signature.
+
+    Returns ``(status, block_height, changed)``:
+      - ``status``: ``"none"`` (no OTS anchor), ``"mismatch"`` (the proof does not
+        commit to this manifest — altered file or wrong proof), ``"pending"``
+        (acknowledged by a calendar but not yet in a Bitcoin block), or
+        ``"confirmed"``.
+      - ``block_height``: the Bitcoin block height if confirmed, else ``None``.
+      - ``changed``: whether the manifest's anchor block was modified (new proof
+        bytes and/or a newly-recorded confirmation) and should be written back.
+
+    On confirmation, sets ``anchor["status"] = "confirmed"`` and
+    ``anchor["bitcoin_block_height"]``. Never records a confirmation the proof
+    does not actually carry.
+    """
+    anchor = manifest.get("anchor")
+    if not anchor or anchor.get("type") != "opentimestamps" or not anchor.get("ots_base64"):
+        return ("none", None, False)
+
+    old_ots = base64.b64decode(anchor["ots_base64"])
+    new_ots = upgrade(old_ots)  # returns old bytes unchanged if calendars unreachable
+
+    payload_for_anchor = {k: v for k, v in manifest.items() if k != "anchor"}
+    digest = hashlib.sha256(canonical_json(payload_for_anchor)).digest()
+    try:
+        status, height = verify_anchor(digest, new_ots)
+    except ValueError:
+        return ("mismatch", None, False)
+
+    changed = new_ots != old_ots
+    if status == "confirmed":
+        if anchor.get("status") != "confirmed" or anchor.get("bitcoin_block_height") != height:
+            changed = True
+        anchor["status"] = "confirmed"
+        anchor["bitcoin_block_height"] = height
+    if changed:
+        anchor["ots_base64"] = base64.b64encode(new_ots).decode("ascii")
+
+    return (status, height, changed)

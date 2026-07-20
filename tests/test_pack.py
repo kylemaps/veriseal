@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -219,6 +220,50 @@ def test_report_generated_line_excluded_from_signed_content(
     assert "not part of the sealed evidence" in report
     manifest_bytes = (out_dir / "manifest.seal.json").read_bytes()
     assert b"Report generated" not in manifest_bytes
+
+
+# ── zip output ───────────────────────────────────────────────────────────────
+
+
+def test_pack_zip_creates_archive(sealed_pair: tuple[Path, Path], tmp_path: Path) -> None:
+    mcap, seal_path = sealed_pair
+    result = build_pack(mcap, seal_path, tmp_path / "bundle", as_zip=True)
+    assert result.is_zip is True
+    assert result.out == tmp_path / "bundle.zip"  # .zip suffix auto-appended
+    assert result.out.is_file()
+    assert not (tmp_path / "bundle").exists()  # no leftover directory
+
+
+def test_pack_zip_contains_all_files(sealed_pair: tuple[Path, Path], tmp_path: Path) -> None:
+    mcap, seal_path = sealed_pair
+    result = build_pack(mcap, seal_path, tmp_path / "bundle.zip", as_zip=True)
+    with zipfile.ZipFile(result.out) as zf:
+        names = set(zf.namelist())
+        assert {"manifest.seal.json", "report.txt", "cover-sheet.txt", "README.txt",
+                "verify.html"} <= names
+        # bundled manifest inside the zip is verbatim
+        bundled = json.loads(zf.read("manifest.seal.json"))
+    assert bundled == json.loads(seal_path.read_bytes())
+
+
+def test_pack_zip_suffix_not_doubled(sealed_pair: tuple[Path, Path], tmp_path: Path) -> None:
+    mcap, seal_path = sealed_pair
+    result = build_pack(mcap, seal_path, tmp_path / "already.zip", as_zip=True)
+    assert result.out == tmp_path / "already.zip"
+    assert result.out.is_file()
+
+
+def test_cli_pack_zip_flag(sealed_pair: tuple[Path, Path], tmp_path: Path) -> None:
+    mcap, seal_path = sealed_pair
+    from typer.testing import CliRunner
+
+    from veriseal.cli import app
+
+    out = tmp_path / "bundle"
+    args = ["pack", str(mcap), str(seal_path), "--out", str(out), "--zip"]
+    result = CliRunner().invoke(app, args)
+    assert result.exit_code == 0
+    assert (tmp_path / "bundle.zip").is_file()
 
 
 # ── exit code plumbing (CLI) ───────────────────────────────────────────────

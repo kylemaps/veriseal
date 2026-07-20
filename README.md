@@ -98,11 +98,17 @@ veriseal inspect log.mcap \
 
 # Build a portable, independently re-verifiable incident-evidence bundle
 veriseal pack log.mcap log.seal.json --out incident-pack/
+veriseal pack log.mcap log.seal.json --out incident-pack --zip   # single .zip to hand off
+
+# Later, check whether a pending Bitcoin timestamp has been confirmed
+veriseal anchor upgrade log.seal.json
 ```
 
 ### OpenTimestamps anchor
 
-By default, `veriseal seal` submits the signed Merkle root to public Bitcoin calendar servers ([OpenTimestamps](https://opentimestamps.org)). The embedded proof starts as `status: "pending"` and becomes `"confirmed"` once a Bitcoin block includes the Merkle path (~1 hour later).
+By default, `veriseal seal` submits the signed Merkle root to public Bitcoin calendar servers ([OpenTimestamps](https://opentimestamps.org)). The embedded proof starts as `status: "pending"` and becomes `"confirmed"` once a Bitcoin block includes the Merkle path (typically a few hours later).
+
+To pull that confirmation into the manifest once it lands, run `veriseal anchor upgrade log.seal.json`: it asks the calendars whether the proof is now in a Bitcoin block and, if so, updates the anchor block in place (`status` -> `confirmed`, block height recorded). The anchor is excluded from the signed payload, so this never invalidates the signature. It never records a confirmation the proof does not actually carry.
 
 `veriseal verify` reports anchor status **informational**: the INTACT/TAMPERED verdict and exit code are unaffected by anchor state unless `--require-anchor` is set:
 
@@ -140,7 +146,8 @@ The whole point of the seal is that *someone who trusts neither the operator nor
 `veriseal pack` bundles an already-sealed log into a portable, self-contained evidence package: the manifest, a plain-English verification report, the OpenTimestamps proof (if any, with its honest pending/confirmed state), an offline copy of the [web verifier](web/verify.html), and a cover sheet explaining what the seal proves — and doesn't. It re-runs the exact same verification `veriseal verify` performs (one code path, two renderings), so the report can never drift from what the CLI would say.
 
 ```bash
-veriseal pack log.mcap log.seal.json --out incident-pack/
+veriseal pack log.mcap log.seal.json --out incident-pack/        # a directory
+veriseal pack log.mcap log.seal.json --out incident-pack --zip    # a single .zip to hand off
 ```
 
 The pack is evidence infrastructure, not a compliance certificate: it supports disclosure obligations under things like the EU Product Liability Directive (2024/2853) or AI Act Article 73 by making a log's integrity independently checkable, but it never asserts the log's *contents* are true, and it never claims to satisfy any regulation on its own.
