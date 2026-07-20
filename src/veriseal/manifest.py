@@ -20,6 +20,7 @@ def build_manifest(
     file_size: int,
     key: Ed25519PrivateKey,
     created_utc: datetime | None = None,
+    source_format: str = "mcap",
 ) -> dict:
     """
     Construct and sign the veriseal manifest.
@@ -56,6 +57,7 @@ def build_manifest(
         "created_utc": created_utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "source": {
             "filename": path.name,
+            "format": source_format,
             "sha256": file_sha256,
             "size_bytes": file_size,
         },

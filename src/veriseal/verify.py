@@ -24,7 +24,8 @@ from cryptography.hazmat.primitives.serialization import (
 from rich.console import Console
 
 from veriseal.canonical import canonical_json
-from veriseal.mcap_io import file_digest, iter_messages
+from veriseal.formats import iter_messages
+from veriseal.mcap_io import file_digest
 from veriseal.merkle import leaf_hash, merkle_root
 from veriseal.signing import verify as ed25519_verify
 
