@@ -19,6 +19,8 @@ from __future__ import annotations
 
 import base64
 import json
+import tempfile
+import zipfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib.resources import files as _resource_files
@@ -58,9 +60,10 @@ def _read_web_verifier() -> bytes:
 
 @dataclass
 class PackResult:
-    out_dir: Path
+    out: Path  # the directory or .zip file that was written
     ok: bool
     result: VerificationResult
+    is_zip: bool = False
 
 
 def _iso(dt: datetime) -> str:
@@ -318,26 +321,46 @@ report.txt. Keep {mcap_name} together with this bundle.
 def build_pack(
     mcap_path: Path,
     seal_path: Path,
-    out_dir: Path,
+    out: Path,
     pubkey_path: Path | None = None,
+    as_zip: bool = False,
 ) -> PackResult:
-    """Build an incident-evidence bundle at *out_dir* from a sealed MCAP.
+    """Build an incident-evidence bundle from a sealed MCAP.
 
     Re-runs the same verification `veriseal verify` performs (via
     `run_verification`) and renders its result into a portable pack. Does not
     copy the MCAP itself (it may be large); the pack references it by name and
     digest and expects it to travel alongside the bundle.
+
+    With *as_zip*, writes a single ``.zip`` (``out`` gets a ``.zip`` suffix if it
+    lacks one); otherwise writes the bundle as a directory at *out*.
     """
     manifest = json.loads(seal_path.read_bytes())
     result = run_verification(mcap_path, manifest, pubkey_path)
+    generated_at = datetime.now(UTC)
 
+    if as_zip:
+        zip_path = out if out.suffix.lower() == ".zip" else out.parent / (out.name + ".zip")
+        with tempfile.TemporaryDirectory() as td:
+            staged = Path(td) / "pack"
+            _write_pack_files(staged, manifest, result, generated_at)
+            _zip_dir(staged, zip_path)
+        return PackResult(out=zip_path, ok=result.ok, result=result, is_zip=True)
+
+    _write_pack_files(out, manifest, result, generated_at)
+    return PackResult(out=out, ok=result.ok, result=result, is_zip=False)
+
+
+def _write_pack_files(
+    out_dir: Path, manifest: dict, result: VerificationResult, generated_at: datetime
+) -> None:
+    """Write all bundle files into *out_dir* (created if needed)."""
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # 1. Manifest, verbatim (canonical bytes, matching what was signed/anchored).
     (out_dir / "manifest.seal.json").write_bytes(canonical_json(manifest))
 
     # 2. Human-readable report. Generation timestamp is explicitly out-of-band.
-    generated_at = datetime.now(UTC)
     (out_dir / "report.txt").write_text(_build_report(result, generated_at), encoding="utf-8")
 
     # 3. OTS proof, if present, as raw binary (independently checkable with any
@@ -362,4 +385,20 @@ def build_pack(
     )
     (out_dir / "README.txt").write_text(readme, encoding="utf-8")
 
-    return PackResult(out_dir=out_dir, ok=result.ok, result=result)
+
+def _zip_dir(src_dir: Path, zip_path: Path) -> None:
+    """Zip the contents of *src_dir* into *zip_path*.
+
+    Entries are sorted and given a fixed timestamp so the archive is reproducible
+    for identical inputs (the only run-to-run variation is report.txt's explicitly
+    out-of-band 'Report generated' line).
+    """
+    zip_path.parent.mkdir(parents=True, exist_ok=True)
+    files = sorted(p for p in src_dir.rglob("*") if p.is_file())
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for f in files:
+            arcname = f.relative_to(src_dir).as_posix()
+            info = zipfile.ZipInfo(arcname, date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o644 << 16
+            zf.writestr(info, f.read_bytes())
