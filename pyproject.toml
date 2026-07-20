@@ -10,6 +10,19 @@ readme = "README.md"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Kyle Mapue", email = "kyle@mapuekyle.com" }]
 requires-python = ">=3.11"
+keywords = ["mcap", "ros", "rosbag", "robotics", "tamper-evident", "integrity", "ed25519", "opentimestamps", "provenance"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Legal Industry",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Security :: Cryptography",
+    "Operating System :: OS Independent",
+]
 dependencies = [
     "mcap>=1.1.1",
     "cryptography>=42.0.0",
@@ -28,6 +41,22 @@ veriseal = "veriseal.cli:app"
 [project.urls]
 Homepage = "https://github.com/kylemaps/veriseal"
 Repository = "https://github.com/kylemaps/veriseal"
+
+[tool.hatch.build.targets.sdist]
+# Ship only the Python package sources + docs in the sdist. `only-include` is
+# restrictive (a plain `include` is additive and still drags in the whole tree,
+# e.g. veriseal-panel/node_modules — hundreds of MB). The TS panel is a separate
+# sub-project, not part of the Python distribution. (pyproject.toml + PKG-INFO
+# are added by hatchling automatically.)
+only-include = [
+    "src/veriseal",
+    "web/verify.html",
+    "tests",
+    "docs",
+    "README.md",
+    "SPEC-manifest.md",
+    "LICENSE",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/veriseal"]
