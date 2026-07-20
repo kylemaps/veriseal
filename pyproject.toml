@@ -28,6 +28,13 @@ Repository = "https://github.com/kylemaps/veriseal"
 [tool.hatch.build.targets.wheel]
 packages = ["src/veriseal"]
 
+# Bundle the standalone offline verifier into the wheel so `veriseal pack` can
+# include it even when veriseal is pip-installed (the pack references it by name
+# in its cover sheet, so it must always be present). Source of truth stays at
+# web/verify.html; it is copied to veriseal/_assets/verify.html at build time.
+[tool.hatch.build.targets.wheel.force-include]
+"web/verify.html" = "veriseal/_assets/verify.html"
+
 [dependency-groups]
 dev = [
     "pytest>=8.0.0",

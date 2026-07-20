@@ -16,7 +16,7 @@
     "lint:fix": "eslint --fix .",
     "local-install": "foxglove-extension install",
     "package": "foxglove-extension package",
-    "test": "node test/sealcore.test.mjs"
+    "test": "node test/sealcore.test.mjs && node test/webverify.test.mjs"
   },
   "devDependencies": {
     "@foxglove/eslint-plugin": "2.1.2",

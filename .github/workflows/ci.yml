@@ -30,3 +30,33 @@ jobs:
 
       - name: Test
         run: pytest
+
+  panel:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: veriseal-panel
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: veriseal-panel/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      # Verifies the panel's crypto core matches the Python reference, including
+      # the RFC 6962 Merkle split-point regression (large-leaf fixture).
+      - name: Test
+        run: npm test

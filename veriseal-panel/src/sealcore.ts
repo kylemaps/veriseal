@@ -159,10 +159,11 @@ async function internalNode(left: Bytes, right: Bytes): Promise<Bytes> {
 }
 /**
  * Largest power of two strictly less than n (RFC 6962 §2.1), i.e. Python's
- * `1 << ((n - 1).bit_length() - 1)`. Must be exact integer math: Math.log2 can
- * return a value a hair under the true integer for large n (e.g. n-1 a power of
- * two), flooring to one less and picking the wrong split — which produces a
- * DIFFERENT (wrong) Merkle root on a perfectly genuine seal.
+ * `1 << ((n - 1).bit_length() - 1)`. Exact integer math (clz32), so the split is
+ * provably identical to the Python reference with no dependence on float rounding.
+ * (An earlier version used `1 << Math.floor(Math.log2(n - 1))`; within the valid
+ * domain, n-1 < 2^31, that never actually diverged, but exact-by-construction
+ * removes any doubt and any need to reason about IEEE-754 edge cases.)
  */
 function largestPow2Below(n: number): number {
   return 1 << (31 - Math.clz32(n - 1));

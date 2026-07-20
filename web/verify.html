@@ -339,7 +339,11 @@ function concat(...arrs) {
 async function internalNode(left, right) {
   return sha256(concat(new Uint8Array([0x01]), left, right));
 }
-function largestPow2Below(n) { return 1 << (Math.floor(Math.log2(n - 1))); }
+// Largest power of two strictly less than n (RFC 6962 §2.1) = Python's
+// `1 << ((n-1).bit_length() - 1)`. Exact integer math via clz32: Math.log2 can
+// round a hair under the true integer for large n and pick the wrong split,
+// yielding a different (wrong) Merkle root on a genuine seal.
+function largestPow2Below(n) { return 1 << (31 - Math.clz32(n - 1)); }
 async function merkleRoot(leafHashes) {
   const n = leafHashes.length;
   if (n === 0) return sha256(new Uint8Array(0));

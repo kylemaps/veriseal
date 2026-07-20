@@ -80,6 +80,22 @@ def test_pack_bundles_web_verifier(sealed_pair: tuple[Path, Path], tmp_path: Pat
     assert bundled.read_bytes() == original.read_bytes()
 
 
+def test_web_verifier_bundled_into_wheel() -> None:
+    """The offline verifier must be force-included into the wheel, or a pip-installed
+    `veriseal pack` would silently omit it while the cover sheet claims it is present.
+
+    Guards the [tool.hatch.build.targets.wheel.force-include] mapping in pyproject.toml.
+    """
+    import tomllib
+
+    pyproject = Path(__file__).resolve().parent.parent / "pyproject.toml"
+    config = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    force_include = config["tool"]["hatch"]["build"]["targets"]["wheel"]["force-include"]
+    # web/verify.html must be mapped into the veriseal package tree
+    assert "web/verify.html" in force_include
+    assert force_include["web/verify.html"].startswith("veriseal/")
+
+
 def test_pack_manifest_is_verbatim(sealed_pair: tuple[Path, Path], tmp_path: Path) -> None:
     """The bundled manifest must be byte-identical (as canonical JSON) to the input."""
     mcap, seal_path = sealed_pair
