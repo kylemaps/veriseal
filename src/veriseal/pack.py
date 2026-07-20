@@ -19,15 +19,41 @@ from __future__ import annotations
 
 import base64
 import json
-import shutil
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from importlib.resources import files as _resource_files
 from pathlib import Path
 
 from veriseal.canonical import canonical_json
 from veriseal.verify import VerificationResult, run_verification
 
-_WEB_VERIFIER = Path(__file__).resolve().parent.parent.parent / "web" / "verify.html"
+# Repo-relative copy: used from a source checkout or an editable install, where
+# the packaged asset below does not physically exist.
+_WEB_VERIFIER_REPO = Path(__file__).resolve().parent.parent.parent / "web" / "verify.html"
+
+
+def _read_web_verifier() -> bytes:
+    """Return the bytes of the standalone offline verifier (web/verify.html).
+
+    Tries the packaged asset first (present in a pip-installed wheel via the
+    force-include in pyproject.toml), then the repo-relative copy (source checkout
+    or editable install). Raises if neither is found: the pack's cover sheet and
+    README name verify.html as included, so building a pack without it would be
+    dishonest — we refuse rather than ship a bundle that misrepresents itself.
+    """
+    try:
+        packaged = _resource_files("veriseal").joinpath("_assets/verify.html")
+        if packaged.is_file():
+            return packaged.read_bytes()
+    except (ModuleNotFoundError, FileNotFoundError, TypeError):
+        pass
+    if _WEB_VERIFIER_REPO.is_file():
+        return _WEB_VERIFIER_REPO.read_bytes()
+    raise FileNotFoundError(
+        "Cannot locate the offline verifier (web/verify.html) to bundle into the "
+        "pack. It is a required part of the evidence bundle; refusing to build a "
+        "pack that claims to include it but does not."
+    )
 
 
 @dataclass
@@ -321,9 +347,8 @@ def build_pack(
         (out_dir / "anchor.ots").write_bytes(base64.b64decode(anchor["ots_base64"]))
 
     # 4. Offline web verifier, bundled so the recipient never has to trust a
-    #    network fetch to re-check the evidence.
-    if _WEB_VERIFIER.exists():
-        shutil.copy2(_WEB_VERIFIER, out_dir / "verify.html")
+    #    network fetch to re-check the evidence. Always present (or we raise).
+    (out_dir / "verify.html").write_bytes(_read_web_verifier())
 
     # 5. Cover sheet.
     (out_dir / "cover-sheet.txt").write_text(_COVER_SHEET, encoding="utf-8")

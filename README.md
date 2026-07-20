@@ -4,7 +4,7 @@ For incident investigators and safety teams who need to prove a robot/autonomy l
 
 A CLI that seals a robot/autonomy log (MCAP) with an Ed25519 signature and a Bitcoin timestamp (OpenTimestamps), producing a `.seal.json` manifest. A disinterested party can later prove "this log matches a seal made by key K, anchored at time T", but only if the verifier **pins the signer's key** (`--pubkey`). Without key pinning, a tampered re-seal with a new key still passes.
 
-> **Status:** early v0.1, solo project: seal/verify/inspect work end-to-end, but APIs may change. Adversarial feedback welcome: [open an issue](https://github.com/kylemaps/veriseal/issues).
+> **Status:** early v0.1, solo project: seal/verify/inspect/pack work end-to-end, but APIs may change. Adversarial feedback welcome: [open an issue](https://github.com/kylemaps/veriseal/issues).
 
 ![CI](https://github.com/kylemaps/veriseal/actions/workflows/ci.yml/badge.svg)
 
@@ -213,7 +213,7 @@ path from "here's a robot log" to "here's what it costs to insure."
 
 ## Roadmap
 
-- **v0.1:** seal / verify / inspect on MCAP + OpenTimestamps anchor
+- **v0.1:** seal / verify / inspect / pack on MCAP + OpenTimestamps anchor; independent web verifier; Foxglove panel
 - **v0.2:** chain-of-custody log; RFC 3161 + Sigstore/Rekor option; ROS 2 bag ingest; HTML report
 - **v0.3:** web viewer; sealing daemon; pluggable transparency-log backend
 

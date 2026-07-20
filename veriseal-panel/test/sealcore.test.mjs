@@ -87,11 +87,13 @@ const shape = crossCheckShape(manifest, { topics: new Set(["/pose", "/status", "
 check("crossCheckShape flags unsealed topic", shape.extraTopics.join(",") === "/extra");
 
 // 7. Large leaf count (1237 leaves — not a power of two, well above the small
-// fixture size). Regression test for the RFC 6962 split-point bug: an earlier
-// version computed the split with `1 << Math.floor(Math.log2(n - 1))`, which can
-// diverge from Python's exact `1 << ((n-1).bit_length() - 1)` and silently
-// produces a DIFFERENT (wrong) root on a genuine seal. Root below was computed by
-// the Python reference (src/veriseal/merkle.py) over the same leaves.
+// fixture size). Multi-level Merkle equivalence guard: locks the tree output to
+// the Python reference (src/veriseal/merkle.py) over the same leaves, catching a
+// wrong domain separator, sort order, or split rule. The split is now exact
+// integer math (`1 << (31 - Math.clz32(n-1))` == Python `1 << (n-1).bit_length()-1`);
+// note that within the valid domain (n-1 < 2^31) the previous float-based split
+// never actually diverged, so this test locks equivalence rather than catching
+// that specific change.
 const large = JSON.parse(readFileSync(join(here, "fixtures/large-leaves.json"), "utf8"));
 const largeRoot = await merkleRootFromLeaves(large.leaves);
 check(
