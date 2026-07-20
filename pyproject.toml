@@ -18,6 +18,10 @@ dependencies = [
     "rich>=13.7.0",
 ]
 
+[project.optional-dependencies]
+# Read ROS 1 .bag files directly (pure Python, no ROS install needed).
+ros1 = ["rosbags>=0.9"]
+
 [project.scripts]
 veriseal = "veriseal.cli:app"
 

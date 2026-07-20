@@ -1,13 +1,23 @@
 # Sealing ROS 1 rosbags
 
-veriseal seals [MCAP](https://mcap.dev/) files. It does not parse ROS 1 `.bag` (rosbag1)
-directly. To seal a ROS 1 log, convert it to MCAP first, then run `veriseal seal` as usual.
+veriseal can seal a ROS 1 `.bag` (rosbag1) **directly** — no conversion step — using the
+optional `rosbags` reader (pure Python, no ROS installation required):
 
-This has been verified end-to-end: a ROS 1 `.bag` fixture (2 topics, 10 messages) converted
-to MCAP, sealed, verified `INTACT`, then a tampered copy correctly verified `TAMPERED` with
-the modified message located.
+```bash
+pip install "veriseal[ros1]"
+veriseal seal drive.bag --no-anchor --out drive.seal.json
+veriseal verify drive.bag drive.seal.json        # INTACT
+```
 
-## Convert `.bag` → `.mcap`
+The bag's messages are hashed as the same `(topic, log_time, payload)` leaves veriseal uses
+for MCAP, so seal / verify / inspect / pack all work identically; the manifest records
+`"source": { "format": "rosbag1", ... }`. Tamper detection locates the changed message just
+as it does for MCAP.
+
+Converting to MCAP first (below) is still fine — for example if you want a single MCAP
+artifact to open in Foxglove — but it is no longer required to seal.
+
+## Convert `.bag` → `.mcap` (optional)
 
 **Option A — [`rosbags`](https://gitlab.com/ternaris/rosbags) (pure Python, no ROS install needed):**
 

@@ -28,7 +28,7 @@ export interface SealManifest {
   schema_version?: string;
   tool_version?: string;
   created_utc?: string;
-  source: { filename: string; sha256: string; size_bytes: number };
+  source: { filename: string; format?: string; sha256: string; size_bytes: number };
   messages: { count: number; log_time_min: number | bigint; log_time_max: number | bigint };
   hash_alg?: string;
   merkle: { scheme?: string; root: string; ordering?: string };

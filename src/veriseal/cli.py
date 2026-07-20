@@ -21,7 +21,7 @@ console = Console()
 
 @app.command()
 def seal(
-    path: Path = typer.Argument(..., help="Path to the .mcap file to seal."),
+    path: Path = typer.Argument(..., help="Path to the log to seal (.mcap, or .bag with [ros1])."),
     key: Path | None = typer.Option(None, "--key", help="Path to Ed25519 private key (PEM)."),
     out: Path | None = typer.Option(
         None, "--out", help="Output path for the .seal.json manifest."
@@ -37,8 +37,50 @@ def seal(
 
 
 @app.command()
+def keygen(
+    out: Path = typer.Option(
+        ..., "--out", "-o", help="Path to write the Ed25519 private key (PEM)."
+    ),
+    pub: Path | None = typer.Option(
+        None, "--pub", help="Also write the public key (PEM) to this path."
+    ),
+    force: bool = typer.Option(
+        False, "--force", help="Overwrite --out if it already exists."
+    ),
+) -> None:
+    """Generate an Ed25519 signer keypair for sealing.
+
+    Use one persistent key across recordings (pass it to `veriseal seal --key`), and
+    share the printed public key out-of-band so others can pin your seals with
+    `veriseal verify --pubkey`.
+    """
+    from veriseal.signing import generate_key, public_pem, save_private_pem
+
+    if out.exists() and not force:
+        console.print(
+            f"[bold red]ERROR:[/bold red] {out} already exists. "
+            "Refusing to overwrite a signer key (use --force to override)."
+        )
+        raise typer.Exit(code=1)
+
+    key = generate_key()
+    save_private_pem(key, out)
+    pub_pem = public_pem(key)
+    if pub is not None:
+        pub.write_text(pub_pem, encoding="utf-8")
+
+    console.print(f"[green]Wrote private key[/green] -> [cyan]{out}[/cyan]  (keep this secret)")
+    if pub is not None:
+        console.print(f"[green]Wrote public key[/green]  -> [cyan]{pub}[/cyan]")
+    console.print(
+        "\n[bold]Public key[/bold] — share this out-of-band so others can pin your seals:"
+    )
+    console.print(pub_pem.strip())
+
+
+@app.command()
 def verify(
-    path: Path = typer.Argument(..., help="Path to the .mcap file to verify."),
+    path: Path = typer.Argument(..., help="Path to the log to verify (.mcap or .bag)."),
     seal_json: Path = typer.Argument(
         ..., help="Path to the .seal.json manifest.", metavar="PATH.seal.json"
     ),
@@ -70,7 +112,7 @@ def verify(
 
 @app.command()
 def pack(
-    path: Path = typer.Argument(..., help="Path to the sealed .mcap file."),
+    path: Path = typer.Argument(..., help="Path to the sealed log (.mcap or .bag)."),
     seal_json: Path = typer.Argument(
         ..., help="Path to the .seal.json manifest.", metavar="PATH.seal.json"
     ),

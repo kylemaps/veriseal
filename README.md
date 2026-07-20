@@ -33,8 +33,11 @@ pip install -e .
 ## Quickstart
 
 ```bash
-# Seal a log (generates a fresh key; submits Merkle root to OpenTimestamps by default)
-veriseal seal log.mcap --out log.seal.json
+# Generate a reusable signer key (and its public key, to share for pinning)
+veriseal keygen --out signer.key.pem --pub signer.pub.pem
+
+# Seal a log (submits Merkle root to OpenTimestamps by default)
+veriseal seal log.mcap --key signer.key.pem --out log.seal.json
 
 # Seal without OpenTimestamps, fast, fully offline
 veriseal seal log.mcap --no-anchor --out log.seal.json
@@ -129,9 +132,13 @@ Require a valid anchor (useful in audit pipelines):
 veriseal verify log.mcap log.seal.json --pubkey signer.pub.pem --require-anchor
 ```
 
-### ROS 1 rosbags
+### Auto-sealing every recording
 
-veriseal seals MCAP; it doesn't read ROS 1 `.bag` directly. Convert first, then seal: see [docs/ros1.md](docs/ros1.md).
+Add one step to your ROS 2 recording workflow so every log is sealed the moment it finishes: generate a signer key once with `veriseal keygen`, then run `veriseal seal` on the recorder's exit (a post-record one-liner, or an `OnProcessExit` handler in a launch file). Copy-paste snippets: [docs/auto-seal.md](docs/auto-seal.md).
+
+### ROS 1 rosbags and other formats
+
+veriseal hashes `(topic, log_time, payload)` message triples, which aren't MCAP-specific. It seals **MCAP** natively and **ROS 1 `.bag`** directly via the optional `rosbags` reader (pure Python, no ROS install): `pip install "veriseal[ros1]"`, then `veriseal seal drive.bag ...`. Seal / verify / inspect / pack all work the same across formats; the manifest records `source.format`. See [docs/ros1.md](docs/ros1.md).
 
 ### Independent web verifier
 

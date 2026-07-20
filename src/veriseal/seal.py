@@ -11,8 +11,9 @@ from rich.console import Console
 from rich.panel import Panel
 
 from veriseal.canonical import canonical_json
+from veriseal.formats import detect_format, iter_messages
 from veriseal.manifest import build_manifest
-from veriseal.mcap_io import file_digest, iter_messages
+from veriseal.mcap_io import file_digest
 from veriseal.signing import generate_key, load_private_pem, save_private_pem
 
 console = Console()
@@ -45,8 +46,9 @@ def seal(
         key = load_private_pem(key_path)
 
     sha256_hex, size = file_digest(path)
+    source_format = detect_format(path)
     messages = list(iter_messages(path))
-    manifest = build_manifest(path, messages, sha256_hex, size, key)
+    manifest = build_manifest(path, messages, sha256_hex, size, key, source_format=source_format)
 
     if do_anchor:
         # anchor_digest = SHA-256(canonical_json(manifest WITHOUT "anchor"))

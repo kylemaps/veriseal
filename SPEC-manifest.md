@@ -100,9 +100,10 @@ This commits to: `schema_version`, `tool_version`, `created_utc`, `source`, `mes
 
   // ── Source file ─────────────────────────────────────────────────────────────
   "source": {
-    "filename": "log.mcap",                   // basename of the sealed MCAP
-    "sha256": "<64 lower-case hex chars>",    // SHA-256 of raw MCAP file bytes
-    "size_bytes": 123456                      // byte length of MCAP file (integer)
+    "filename": "log.mcap",                   // basename of the sealed file
+    "format": "mcap",                         // "mcap" | "rosbag1" — container the leaves came from
+    "sha256": "<64 lower-case hex chars>",    // SHA-256 of raw file bytes
+    "size_bytes": 123456                      // byte length of the file (integer)
   },
 
   // ── Message summary ─────────────────────────────────────────────────────────
