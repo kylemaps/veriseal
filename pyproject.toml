@@ -88,3 +88,6 @@ select = ["E", "F", "I", "UP"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "network: hits live OpenTimestamps calendars",
+]
