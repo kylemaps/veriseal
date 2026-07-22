@@ -141,6 +141,9 @@ def run_verification(
     ]
 
     # ── Recompute Merkle root (same sort as seal) ─────────────────────────────
+    # (log_time, topic, leaf_hash). Python sorts strings by Unicode code point;
+    # the JS verifiers use `<` (UTF-16 code unit). Same as manifest.py: agrees on
+    # the BMP, can diverge for astral-plane topics — keep this in lockstep.
     sorted_recomputed = sorted(recomputed_entries, key=lambda x: (x[1], x[0], x[2]))
     recomputed_hashes = [bytes.fromhex(lh) for _, _, lh in sorted_recomputed]
     recomputed_root = merkle_root(recomputed_hashes).hex()

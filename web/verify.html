@@ -418,7 +418,10 @@ function rawKeyHexSafe(pem) {
 }
 
 async function recomputeMerkle(manifest) {
-  // sort leaves by (log_time, topic, leaf_hash) — same as seal
+  // sort leaves by (log_time, topic, leaf_hash) — same as seal.
+  // NOTE: `<` compares strings by UTF-16 code unit; the Python reference sorts by
+  // Unicode code point. Agrees for the BMP, can diverge for astral-plane topics
+  // (> U+FFFF). Topics are expected ASCII — don't diverge from the Python sort.
   const leaves = manifest.leaves.slice().sort((a, b) => {
     if (a.log_time < b.log_time) return -1;
     if (a.log_time > b.log_time) return 1;
