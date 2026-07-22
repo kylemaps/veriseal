@@ -19,6 +19,27 @@ from veriseal.signing import generate_key, load_private_pem, save_private_pem
 console = Console()
 
 
+# Extensions we recognise as the sealed-log container. Only the final one is
+# stripped when deriving output names, so dotted stems are preserved.
+_LOG_EXTENSIONS = (".mcap", ".bag")
+
+
+def _derive_output(path: Path, new_ext: str) -> Path:
+    """Return *path* with its final known log extension replaced by *new_ext*.
+
+    Uses the full filename and strips ONLY the final recognised extension, so
+    ``data.2026.mcap`` -> ``data.2026.seal.json`` (not ``data.seal.json``).
+    ``Path.with_suffix`` would drop the ``.2026`` segment and let distinct inputs
+    (``data.2026.mcap`` / ``data.2025.mcap``) collide onto one output.
+    """
+    name = path.name
+    for ext in _LOG_EXTENSIONS:
+        if name.lower().endswith(ext):
+            name = name[: -len(ext)]
+            break
+    return path.parent / (name + new_ext)
+
+
 def seal(
     path: Path,
     key_path: Path | None,
@@ -27,15 +48,11 @@ def seal(
 ) -> None:
     """Read *path*, compute Merkle tree, sign, write manifest to *out_path*."""
     if out_path is None:
-        out_path = path.with_suffix("").with_suffix(".seal.json")
-        if out_path == path:
-            out_path = path.parent / (path.name + ".seal.json")
+        out_path = _derive_output(path, ".seal.json")
 
     if key_path is None:
         key = generate_key()
-        key_path = path.with_suffix("").with_suffix(".key.pem")
-        if key_path == path:
-            key_path = path.parent / (path.name + ".key.pem")
+        key_path = _derive_output(path, ".key.pem")
         save_private_pem(key, key_path)
         console.print(
             f"[bold yellow]WARNING:[/bold yellow] Generated new private key -> "
@@ -84,8 +101,7 @@ def seal(
         Panel(
             f"[bold]Messages:[/bold]    {manifest['messages']['count']}\n"
             f"[bold]Merkle root:[/bold] {manifest['merkle']['root']}\n"
-            f"[bold]Manifest:[/bold]    {out_path}"
-            + anchor_status,
+            f"[bold]Manifest:[/bold]    {out_path}" + anchor_status,
             title="[green]Seal complete[/green]",
             expand=False,
         )
