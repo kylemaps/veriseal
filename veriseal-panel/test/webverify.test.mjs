@@ -83,6 +83,46 @@ check("sample seal Merkle root matches Python-signed root", sampleRoot === EXPEC
 const sig = await sandbox.verifySignature(manifest);
 check("sample seal signature verifies", sig.ok === true);
 
+// 5. Cross-verifier agreement on a NON-MESSAGE byte change (the Commit-1 bug).
+//    Run the page's embedded sample (a real CLI-sealed mcap + seal), then flip a
+//    byte OUTSIDE any message payload (the header region). The file digest must
+//    fail while signature + Merkle still pass — so the web verifier's verdict is
+//    TAMPERED, exactly as `veriseal verify` now reports (source_ok gates both).
+const secondOpen = html.indexOf("<script>", close);
+const secondClose = html.indexOf("</script>", secondOpen);
+const sampleBody = html.slice(secondOpen + "<script>".length, secondClose);
+vm.runInContext(sampleBody, sandbox);
+const sample = sandbox.window.__SAMPLE__;
+check("embedded sample present", sample != null && typeof sample.mcapHex === "string");
+
+const sampleManifest = sandbox.parseSealPreservingBigInts(sample.sealJson);
+const mcap = sandbox.hexToBytes(sample.mcapHex);
+
+async function fileOk(bytes) {
+  const digest = sandbox.bytesToHex(await sandbox.sha256(bytes));
+  return digest === sampleManifest.source.sha256 && bytes.length === sampleManifest.source.size_bytes;
+}
+const rootOk = (await sandbox.recomputeMerkle(sampleManifest)) === sampleManifest.merkle.root;
+const sigOk = (await sandbox.verifySignature(sampleManifest)).ok === true;
+
+// Genuine sample: all three checks pass -> verdict would be VERIFIED (pre-pin).
+check("genuine sample: file digest ok", await fileOk(mcap));
+check("genuine sample: signature + merkle ok", sigOk && rootOk);
+
+// Flip a header-region byte (offset 40: inside the mcap header record's library
+// string, not any sealed (topic,log_time,payload) triple).
+const altered = mcap.slice();
+altered[40] ^= 0xff;
+const alteredFileOk = await fileOk(altered);
+// Merkle recompute reads manifest.leaves, so it (and the signature) are
+// unchanged by a file-byte flip — only the whole-file digest moves.
+check("non-message flip: file digest FAILS", alteredFileOk === false);
+check("non-message flip: signature + merkle still pass", sigOk && rootOk);
+check(
+  "non-message flip: combined verdict is TAMPERED (agrees with Python)",
+  (sigOk && rootOk && alteredFileOk) === false,
+);
+
 if (failures > 0) {
   console.error(`\n${failures} check(s) failed`);
   process.exit(1);
