@@ -22,9 +22,7 @@ def _write_mcap(path: Path, messages: list[tuple[str, int, bytes]]) -> Path:
         writer.start()
         schema_id = writer.register_schema(name="raw", encoding="", data=b"")
         channel_ids: dict[str, int] = {
-            topic: writer.register_channel(
-                topic=topic, message_encoding="", schema_id=schema_id
-            )
+            topic: writer.register_channel(topic=topic, message_encoding="", schema_id=schema_id)
             for topic in topics
         }
         for topic, log_time, data in messages:
@@ -80,7 +78,7 @@ def test_modified_payload_returns_1(sealed_pair: tuple[Path, Path], tmp_path: Pa
     tampered_msgs = [
         ("/pose", 1_000_000, b"\x01"),
         ("/status", 2_000_000, b"\xaa"),
-        ("/pose", 3_000_000, b"\xFF"),  # payload changed
+        ("/pose", 3_000_000, b"\xff"),  # payload changed
         ("/status", 4_000_000, b"\xbb"),
         ("/pose", 5_000_000, b"\x03"),
     ]
@@ -88,15 +86,13 @@ def test_modified_payload_returns_1(sealed_pair: tuple[Path, Path], tmp_path: Pa
     assert verify_seal(tampered_mcap, seal_path) == 1
 
 
-def test_modified_payload_locates_message(
-    sealed_pair: tuple[Path, Path], tmp_path: Path
-) -> None:
+def test_modified_payload_locates_message(sealed_pair: tuple[Path, Path], tmp_path: Path) -> None:
     """The manifest leaf for (/pose, 3_000_000) must differ from the tampered leaf."""
     _, seal_path = sealed_pair
     tampered_msgs = [
         ("/pose", 1_000_000, b"\x01"),
         ("/status", 2_000_000, b"\xaa"),
-        ("/pose", 3_000_000, b"\xFF"),  # payload changed
+        ("/pose", 3_000_000, b"\xff"),  # payload changed
         ("/status", 4_000_000, b"\xbb"),
         ("/pose", 5_000_000, b"\x03"),
     ]
@@ -104,12 +100,11 @@ def test_modified_payload_locates_message(
     from veriseal.merkle import leaf_hash
 
     original_lh = leaf_hash("/pose", 3_000_000, b"\x02").hex()
-    tampered_lh = leaf_hash("/pose", 3_000_000, b"\xFF").hex()
+    tampered_lh = leaf_hash("/pose", 3_000_000, b"\xff").hex()
     assert original_lh != tampered_lh
     manifest = json.loads(seal_path.read_bytes())
     leaves_by_key = {
-        (entry["topic"], entry["log_time"]): entry["leaf_hash"]
-        for entry in manifest["leaves"]
+        (entry["topic"], entry["log_time"]): entry["leaf_hash"] for entry in manifest["leaves"]
     }
     assert leaves_by_key[("/pose", 3_000_000)] == original_lh
 
@@ -165,9 +160,7 @@ def test_added_message_locates(sealed_pair: tuple[Path, Path], tmp_path: Path) -
 # ── TAMPERED: manifest field corrupted → signature invalid ───────────────────
 
 
-def test_corrupted_manifest_field_returns_1(
-    sealed_pair: tuple[Path, Path], tmp_path: Path
-) -> None:
+def test_corrupted_manifest_field_returns_1(sealed_pair: tuple[Path, Path], tmp_path: Path) -> None:
     """Changing created_utc in the manifest must invalidate the signature."""
     mcap, seal_path = sealed_pair
     manifest = json.loads(seal_path.read_bytes())
@@ -179,9 +172,7 @@ def test_corrupted_manifest_field_returns_1(
     assert verify_seal(mcap, corrupt_seal) == 1
 
 
-def test_corrupted_merkle_root_returns_1(
-    sealed_pair: tuple[Path, Path], tmp_path: Path
-) -> None:
+def test_corrupted_merkle_root_returns_1(sealed_pair: tuple[Path, Path], tmp_path: Path) -> None:
     """Zeroing the merkle root in the manifest must fail (root mismatch + sig invalid)."""
     mcap, seal_path = sealed_pair
     manifest = json.loads(seal_path.read_bytes())

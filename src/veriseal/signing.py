@@ -39,10 +39,14 @@ def save_private_pem(key: Ed25519PrivateKey, path: Path) -> None:
 
 
 def public_pem(key: Ed25519PrivateKey) -> str:
-    return key.public_key().public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    ).decode("utf-8")
+    return (
+        key.public_key()
+        .public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        .decode("utf-8")
+    )
 
 
 def sign(key: Ed25519PrivateKey, msg: bytes) -> bytes:

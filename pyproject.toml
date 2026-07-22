@@ -4,10 +4,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "veriseal"
-version = "0.1.1.dev0"
+version = "0.1.1"
 description = "Tamper-evident, independently-verifiable incident packages for robot/autonomy logs (MCAP)"
 readme = "README.md"
-license = { text = "Apache-2.0" }
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 authors = [{ name = "Kyle Mapue", email = "kyle@mapuekyle.com" }]
 requires-python = ">=3.11"
 keywords = ["mcap", "ros", "rosbag", "robotics", "tamper-evident", "integrity", "ed25519", "opentimestamps", "provenance"]
@@ -15,7 +16,6 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Legal Industry",
-    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -24,11 +24,13 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "mcap>=1.1.1",
-    "cryptography>=42.0.0",
-    "opentimestamps>=0.4.5",
-    "typer>=0.12.0",
-    "rich>=13.7.0",
+    # Upper caps guard against a future major that breaks the wire/API we rely on;
+    # bump deliberately after testing against the new major.
+    "mcap>=1.1.1,<2",
+    "cryptography>=42.0.0,<47",
+    "opentimestamps>=0.4.5,<0.5",
+    "typer>=0.12.0,<0.16",
+    "rich>=13.7.0,<15",
 ]
 
 [project.optional-dependencies]
@@ -41,6 +43,9 @@ veriseal = "veriseal.cli:app"
 [project.urls]
 Homepage = "https://github.com/kylemaps/veriseal"
 Repository = "https://github.com/kylemaps/veriseal"
+Issues = "https://github.com/kylemaps/veriseal/issues"
+Documentation = "https://github.com/kylemaps/veriseal/blob/main/README.md"
+Changelog = "https://github.com/kylemaps/veriseal/releases"
 
 [tool.hatch.build.targets.sdist]
 # Ship only the Python package sources + docs in the sdist. `only-include` is

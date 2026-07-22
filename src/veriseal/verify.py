@@ -251,8 +251,7 @@ def verify_seal(
         # is ALWAYS reported (not only on failure) and INTACT visibly means the
         # bytes on disk match the sealed digest.
         console.print(
-            f"  [green]Source file unchanged[/green] "
-            f"(SHA-256 {result.actual_sha256[:16]}...)"
+            f"  [green]Source file unchanged[/green] (SHA-256 {result.actual_sha256[:16]}...)"
         )
     else:
         console.print("[bold red]TAMPERED[/bold red]")

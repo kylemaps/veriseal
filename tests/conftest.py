@@ -21,9 +21,7 @@ def sample_mcap(tmp_path: Path) -> Path:
         writer = Writer(f)
         writer.start()
         schema_id = writer.register_schema(name="raw", encoding="", data=b"")
-        ch_pose = writer.register_channel(
-            topic="/pose", message_encoding="", schema_id=schema_id
-        )
+        ch_pose = writer.register_channel(topic="/pose", message_encoding="", schema_id=schema_id)
         ch_status = writer.register_channel(
             topic="/status", message_encoding="", schema_id=schema_id
         )

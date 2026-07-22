@@ -1,8 +1,8 @@
 /**
  * Equivalence test for the STANDALONE web verifier (../../web/verify.html).
  *
- * web/verify.html is a single self-contained page (strict CSP, no imports), so
- * its verification crypto is a third, independent copy of the same logic in the
+ * web/verify.html is a single self-contained page (no external requests, no
+ * imports), so its verification crypto is a third, independent copy of the same logic in the
  * Python reference and the panel's sealcore.ts. That duplication is by design —
  * but it means the web verifier needs its own regression guard, or a bug fixed
  * in one copy (e.g. the RFC 6962 Merkle split-point) can silently persist here.

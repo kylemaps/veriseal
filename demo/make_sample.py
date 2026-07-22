@@ -56,9 +56,9 @@ for i in range(N_STEPS):
     spd = 2.0 + 0.4 * math.sin(math.radians(angle_deg * 2))
 
     messages.append(("/pose", t, _pose(x, y, heading)))
-    messages.append(("/imu", t, _imu(
-        0.12 * math.sin(angle_deg), 0.04, 9.806, 0.015 * math.cos(angle_deg)
-    )))
+    messages.append(
+        ("/imu", t, _imu(0.12 * math.sin(angle_deg), 0.04, 9.806, 0.015 * math.cos(angle_deg)))
+    )
     messages.append(("/vehicle/speed", t, _speed(spd)))
 
     if i % 5 == 0:  # 2 Hz lidar

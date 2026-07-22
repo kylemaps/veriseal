@@ -13,6 +13,7 @@ def _internal(left: bytes, right: bytes) -> bytes:
 
 # ---------- leaf_hash ----------
 
+
 def test_leaf_hash_deterministic():
     h1 = leaf_hash("/pose", 1_000_000, b"\x01")
     h2 = leaf_hash("/pose", 1_000_000, b"\x01")
@@ -33,6 +34,7 @@ def test_leaf_hash_differs_by_payload():
 
 
 # ---------- merkle_root ----------
+
 
 def test_empty_root():
     assert merkle_root([]) == hashlib.sha256(b"").digest()

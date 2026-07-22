@@ -159,7 +159,7 @@ def test_report_on_tampered_log_says_tampered(
     tampered_msgs = [
         ("/pose", 1_000_000, b"\x01"),
         ("/status", 2_000_000, b"\xaa"),
-        ("/pose", 3_000_000, b"\xFF"),  # payload changed
+        ("/pose", 3_000_000, b"\xff"),  # payload changed
         ("/status", 4_000_000, b"\xbb"),
         ("/pose", 5_000_000, b"\x03"),
     ]
@@ -198,9 +198,7 @@ def test_pack_is_byte_deterministic_except_generated_line(
     report_a = (out_a / "report.txt").read_text(encoding="utf-8").splitlines()
     report_b = (out_b / "report.txt").read_text(encoding="utf-8").splitlines()
     assert len(report_a) == len(report_b)
-    diffs = [
-        (i, a, b) for i, (a, b) in enumerate(zip(report_a, report_b, strict=True)) if a != b
-    ]
+    diffs = [(i, a, b) for i, (a, b) in enumerate(zip(report_a, report_b, strict=True)) if a != b]
     assert len(diffs) <= 1
     if diffs:
         i, a, b = diffs[0]
@@ -239,8 +237,13 @@ def test_pack_zip_contains_all_files(sealed_pair: tuple[Path, Path], tmp_path: P
     result = build_pack(mcap, seal_path, tmp_path / "bundle.zip", as_zip=True)
     with zipfile.ZipFile(result.out) as zf:
         names = set(zf.namelist())
-        assert {"manifest.seal.json", "report.txt", "cover-sheet.txt", "README.txt",
-                "verify.html"} <= names
+        assert {
+            "manifest.seal.json",
+            "report.txt",
+            "cover-sheet.txt",
+            "README.txt",
+            "verify.html",
+        } <= names
         # bundled manifest inside the zip is verbatim
         bundled = json.loads(zf.read("manifest.seal.json"))
     assert bundled == json.loads(seal_path.read_bytes())
@@ -286,7 +289,7 @@ def test_cli_pack_exit_code_failure(sealed_pair: tuple[Path, Path], tmp_path: Pa
     tampered_msgs = [
         ("/pose", 1_000_000, b"\x01"),
         ("/status", 2_000_000, b"\xaa"),
-        ("/pose", 3_000_000, b"\xFF"),
+        ("/pose", 3_000_000, b"\xff"),
         ("/status", 4_000_000, b"\xbb"),
         ("/pose", 5_000_000, b"\x03"),
     ]

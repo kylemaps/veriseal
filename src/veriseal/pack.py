@@ -189,15 +189,9 @@ def _build_report(result: VerificationResult, generated_at: datetime) -> str:
     for pline in m["signature"]["public_key"].strip().splitlines():
         lines.append(f"  {pline}")
     lines.append("")
-    lines.append(
-        "This report does NOT establish that the key above belongs to a specific"
-    )
-    lines.append(
-        "organization or individual. Key identity must be established out-of-band"
-    )
-    lines.append(
-        "(e.g. by comparing against a key fingerprint published or provided separately"
-    )
+    lines.append("This report does NOT establish that the key above belongs to a specific")
+    lines.append("organization or individual. Key identity must be established out-of-band")
+    lines.append("(e.g. by comparing against a key fingerprint published or provided separately")
     lines.append("by the sealing party) and pinned with `veriseal verify --pubkey`.")
     lines.append("")
     lines.append("-" * 72)

@@ -107,9 +107,7 @@ def test_bag_and_mcap_share_pipeline(tmp_path: Path) -> None:
     from veriseal.cli import app
 
     runner = CliRunner()
-    r_seal = runner.invoke(
-        app, ["seal", str(bag), "--no-anchor", "--out", str(seal_path)]
-    )
+    r_seal = runner.invoke(app, ["seal", str(bag), "--no-anchor", "--out", str(seal_path)])
     assert r_seal.exit_code == 0
     r_verify = runner.invoke(app, ["verify", str(bag), str(seal_path)])
     assert r_verify.exit_code == 0

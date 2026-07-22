@@ -57,8 +57,15 @@ def test_keygen_seal_verify_pinned(sample_mcap: Path, tmp_path: Path) -> None:
     assert r_keygen.exit_code == 0
 
     seal_path = tmp_path / "log.seal.json"
-    seal_args = ["seal", str(sample_mcap), "--key", str(key_path), "--no-anchor",
-                 "--out", str(seal_path)]
+    seal_args = [
+        "seal",
+        str(sample_mcap),
+        "--key",
+        str(key_path),
+        "--no-anchor",
+        "--out",
+        str(seal_path),
+    ]
     assert runner.invoke(app, seal_args).exit_code == 0
 
     verify_args = ["verify", str(sample_mcap), str(seal_path), "--pubkey", str(pub_path)]
