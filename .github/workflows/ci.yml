@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 # On a PR from a branch in this repo, `push` and `pull_request` would otherwise
 # both fire; cancel the superseded run so we don't pay for duplicate work.
@@ -40,8 +41,14 @@ jobs:
       - name: Format check
         run: ruff format --check .
 
+      # Excludes tests marked "network" (live OpenTimestamps calendar calls),
+      # which are non-deterministic on hosted runners. As of this writing no
+      # test in the tree carries that marker — every anchor.submit/upgrade
+      # call site is monkeypatched (see tests/test_anchor.py,
+      # tests/test_anchor_upgrade.py) — but the filter and marker stay in
+      # place so a future live-calendar test doesn't silently destabilize CI.
       - name: Test
-        run: pytest
+        run: pytest -m "not network"
 
   build:
     runs-on: ubuntu-latest
@@ -90,3 +97,27 @@ jobs:
       # the RFC 6962 Merkle split-point regression (large-leaf fixture).
       - name: Test
         run: npm test
+
+  # Manual-only: exercises tests marked "network" (real OpenTimestamps calendar
+  # calls), kept off the push/PR critical path since calendar availability is
+  # outside our control. Currently a no-op (nothing is marked "network" yet);
+  # trigger via Actions -> CI -> Run workflow once a live-calendar test exists.
+  network:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install package + dev group
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[ros1]" --group dev
+
+      - name: Test (network)
+        run: pytest -m network
