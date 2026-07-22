@@ -76,9 +76,7 @@ def patched_submit(monkeypatch: pytest.MonkeyPatch) -> None:
 # ── seal --anchor writes correct anchor block ─────────────────────────────────
 
 
-def test_anchor_block_written(
-    mcap_path: Path, tmp_path: Path, patched_submit: None
-) -> None:
+def test_anchor_block_written(mcap_path: Path, tmp_path: Path, patched_submit: None) -> None:
     """seal with do_anchor=True writes an anchor dict with expected keys."""
     seal_path = tmp_path / "out.seal.json"
     seal(mcap_path, key_path=None, out_path=seal_path, do_anchor=True)
@@ -106,9 +104,7 @@ def test_anchor_commits_digest_correct(
     assert manifest["anchor"]["commits"] == expected
 
 
-def test_anchor_ots_base64_valid(
-    mcap_path: Path, tmp_path: Path, patched_submit: None
-) -> None:
+def test_anchor_ots_base64_valid(mcap_path: Path, tmp_path: Path, patched_submit: None) -> None:
     """ots_base64 decodes to valid OTS bytes that round-trip as DetachedTimestampFile."""
     from opentimestamps.core.serialize import BytesDeserializationContext
 
@@ -124,9 +120,7 @@ def test_anchor_ots_base64_valid(
     assert dtf.file_digest.hex() == manifest["anchor"]["commits"]
 
 
-def test_anchor_commits_to_signature(
-    mcap_path: Path, tmp_path: Path, patched_submit: None
-) -> None:
+def test_anchor_commits_to_signature(mcap_path: Path, tmp_path: Path, patched_submit: None) -> None:
     """The anchor digest covers the signature field (included in payload_for_anchor)."""
     seal_path = tmp_path / "out.seal.json"
     seal(mcap_path, key_path=None, out_path=seal_path, do_anchor=True)
@@ -231,7 +225,7 @@ def test_prior_verify_tampered_with_no_anchor(mcap_path: Path, tmp_path: Path) -
     seal(mcap_path, key_path=None, out_path=seal_path, do_anchor=False)
 
     tampered_msgs = [
-        ("/pose", 1_000_000, b"\xFF"),  # payload changed
+        ("/pose", 1_000_000, b"\xff"),  # payload changed
         ("/status", 2_000_000, b"\xaa"),
         ("/pose", 3_000_000, b"\x02"),
     ]

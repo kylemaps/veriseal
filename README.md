@@ -8,7 +8,7 @@ A CLI that seals a robot/autonomy log (MCAP) with an Ed25519 signature and a Bit
 
 ![CI](https://github.com/kylemaps/veriseal/actions/workflows/ci.yml/badge.svg)
 
-![demo](demo/demo.gif)
+![demo](https://raw.githubusercontent.com/kylemaps/veriseal/main/demo/demo.gif)
 
 ---
 
@@ -134,23 +134,23 @@ veriseal verify log.mcap log.seal.json --pubkey signer.pub.pem --require-anchor
 
 ### Auto-sealing every recording
 
-Add one step to your ROS 2 recording workflow so every log is sealed the moment it finishes: generate a signer key once with `veriseal keygen`, then run `veriseal seal` on the recorder's exit (a post-record one-liner, or an `OnProcessExit` handler in a launch file). Copy-paste snippets: [docs/auto-seal.md](docs/auto-seal.md).
+Add one step to your ROS 2 recording workflow so every log is sealed the moment it finishes: generate a signer key once with `veriseal keygen`, then run `veriseal seal` on the recorder's exit (a post-record one-liner, or an `OnProcessExit` handler in a launch file). Copy-paste snippets: [docs/auto-seal.md](https://github.com/kylemaps/veriseal/blob/main/docs/auto-seal.md).
 
 ### ROS 1 rosbags and other formats
 
-veriseal hashes `(topic, log_time, payload)` message triples, which aren't MCAP-specific. It seals **MCAP** natively and **ROS 1 `.bag`** directly via the optional `rosbags` reader (pure Python, no ROS install): `pip install "veriseal[ros1]"`, then `veriseal seal drive.bag ...`. `seal`, `verify`, and `pack` work the same across formats (the manifest records `source.format`); `inspect`'s window export is MCAP-only. See [docs/ros1.md](docs/ros1.md).
+veriseal hashes `(topic, log_time, payload)` message triples, which aren't MCAP-specific. It seals **MCAP** natively and **ROS 1 `.bag`** directly via the optional `rosbags` reader (pure Python, no ROS install): `pip install "veriseal[ros1]"`, then `veriseal seal drive.bag ...`. `seal`, `verify`, and `pack` work the same across formats (the manifest records `source.format`); `inspect`'s window export is MCAP-only. See [docs/ros1.md](https://github.com/kylemaps/veriseal/blob/main/docs/ros1.md).
 
 ### Independent web verifier
 
-The whole point of the seal is that *someone who trusts neither the operator nor veriseal* can still check it. [`web/verify.html`](web/verify.html) is a single self-contained page that does exactly that: drop an `.mcap` and its `.seal.json`, and it recomputes the Ed25519 signature, the RFC 6962 Merkle root, and the SHA-256 file digest **entirely in the browser** (WebCrypto, no network calls, nothing uploaded). Open the file locally, or host it anywhere static. An insurer or investigator can verify a sealed log on their own machine without installing anything.
+The whole point of the seal is that *someone who trusts neither the operator nor veriseal* can still check it. [`web/verify.html`](https://github.com/kylemaps/veriseal/blob/main/web/verify.html) is a single self-contained page that does exactly that: drop an `.mcap` and its `.seal.json`, and it recomputes the Ed25519 signature, the RFC 6962 Merkle root, and the SHA-256 file digest **entirely in the browser** (WebCrypto, no network calls, nothing uploaded). To reach a green **VERIFIED** it also asks you to paste the signer's expected public key (obtained out-of-band) and pins it; without a pinned key the result stays amber, since the embedded key alone proves nothing about who signed. Open the file locally, or host it anywhere static. An insurer or investigator can verify a sealed log on their own machine without installing anything.
 
 ### Foxglove panel
 
-[`veriseal-panel/`](veriseal-panel/) is a [Foxglove Studio](https://foxglove.dev) extension that checks a seal **in-workflow**, without leaving your visualization. Open a log, load its `.seal.json`, and a live badge reports **SEALED & AUTHENTIC** or **SEAL INVALID** — verifying the signature and Merkle root against the signer's Ed25519 key. (Whole-file byte integrity stays the CLI/web-verifier's job, since a panel only sees decoded messages, never the raw file bytes.) The panel's verification core is the same logic as the web verifier and is tested against the Python reference.
+[`veriseal-panel/`](https://github.com/kylemaps/veriseal/tree/main/veriseal-panel) is a [Foxglove Studio](https://foxglove.dev) extension that checks a seal **in-workflow**, without leaving your visualization. Open a log, load its `.seal.json`, and a live badge reports **SIGNER VERIFIED** (when you pin the signer's key), **AUTHENTICITY NOT ESTABLISHED** (signature + Merkle valid but no key pinned), or **MANIFEST INVALID** — verifying the signature and Merkle root against the signer's Ed25519 key. (Whole-file byte integrity stays the CLI/web-verifier's job, since a panel only sees decoded messages, never the raw file bytes.) The panel's verification core is the same logic as the web verifier and is tested against the Python reference.
 
 ### Incident-evidence pack
 
-`veriseal pack` bundles an already-sealed log into a portable, self-contained evidence package: the manifest, a plain-English verification report, the OpenTimestamps proof (if any, with its honest pending/confirmed state), an offline copy of the [web verifier](web/verify.html), and a cover sheet explaining what the seal proves — and doesn't. It re-runs the exact same verification `veriseal verify` performs (one code path, two renderings), so the report can never drift from what the CLI would say.
+`veriseal pack` bundles an already-sealed log into a portable, self-contained evidence package: the manifest, a plain-English verification report, the OpenTimestamps proof (if any, with its honest pending/confirmed state), an offline copy of the [web verifier](https://github.com/kylemaps/veriseal/blob/main/web/verify.html), and a cover sheet explaining what the seal proves — and doesn't. It re-runs the exact same verification `veriseal verify` performs (one code path, two renderings), so the report can never drift from what the CLI would say.
 
 ```bash
 veriseal pack log.mcap log.seal.json --out incident-pack/        # a directory
@@ -180,7 +180,7 @@ The pack is evidence infrastructure, not a compliance certificate: it supports d
 3. **Sign**: the manifest (root + all leaves + metadata) is serialized as canonical JSON and signed with Ed25519. The signer's public key is embedded in the manifest.
 4. **Anchor**: the signed manifest is SHA-256 hashed and submitted to [OpenTimestamps](https://opentimestamps.org) public calendars. A Bitcoin block later commits to it, providing a trustless timestamp no single party (including the sealer) can backdate.
 
-The `.seal.json` format is fully documented in **[SPEC-manifest.md](SPEC-manifest.md)**: a conforming verifier needs only that document, the MCAP, and standard crypto libraries.
+The `.seal.json` format is fully documented in **[SPEC-manifest.md](https://github.com/kylemaps/veriseal/blob/main/SPEC-manifest.md)**: a conforming verifier needs only that document, the MCAP, and standard crypto libraries.
 
 ---
 

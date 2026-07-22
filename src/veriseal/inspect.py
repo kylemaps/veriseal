@@ -40,9 +40,7 @@ def parse_time(s: str) -> int:
     # Integer arithmetic to avoid float multiplication; preserves microsecond precision.
     delta = dt - _EPOCH
     return (
-        delta.days * 86_400_000_000_000
-        + delta.seconds * 1_000_000_000
-        + delta.microseconds * 1_000
+        delta.days * 86_400_000_000_000 + delta.seconds * 1_000_000_000 + delta.microseconds * 1_000
     )
 
 
@@ -67,9 +65,7 @@ def inspect_mcap(
     Returns 0 on success, 2 on error.
     """
     if from_ns > to_ns:
-        console.print(
-            f"[bold red]ERROR:[/bold red] --from ({from_ns}) must be <= --to ({to_ns})"
-        )
+        console.print(f"[bold red]ERROR:[/bold red] --from ({from_ns}) must be <= --to ({to_ns})")
         return 2
 
     if out_path is None:
@@ -172,8 +168,7 @@ def inspect_mcap(
 
     console.print(
         Panel(
-            f"[bold]Messages in window:[/bold] {len(windowed)}\n"
-            f"[bold]Output:[/bold] {out_path}",
+            f"[bold]Messages in window:[/bold] {len(windowed)}\n[bold]Output:[/bold] {out_path}",
             title="[green]Inspect complete[/green]",
             expand=False,
         )

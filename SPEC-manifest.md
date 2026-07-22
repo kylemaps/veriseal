@@ -98,7 +98,7 @@ This commits to: `schema_version`, `tool_version`, `created_utc`, `source`, `mes
 {
   // ── Identity ────────────────────────────────────────────────────────────────
   "schema_version": "veriseal-manifest-v1",   // literal — identifies this spec
-  "tool_version": "0.1.1.dev0",               // semver of the sealing tool
+  "tool_version": "0.1.1",                     // semver of the sealing tool
 
   "created_utc": "2026-06-24T04:44:08Z",      // ISO 8601, UTC, second precision, Z suffix
 

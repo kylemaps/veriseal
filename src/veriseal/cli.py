@@ -19,13 +19,12 @@ anchor_app = typer.Typer(
 app.add_typer(anchor_app, name="anchor")
 console = Console()
 
+
 @app.command()
 def seal(
     path: Path = typer.Argument(..., help="Path to the log to seal (.mcap, or .bag with [ros1])."),
     key: Path | None = typer.Option(None, "--key", help="Path to Ed25519 private key (PEM)."),
-    out: Path | None = typer.Option(
-        None, "--out", help="Output path for the .seal.json manifest."
-    ),
+    out: Path | None = typer.Option(None, "--out", help="Output path for the .seal.json manifest."),
     anchor: bool = typer.Option(
         True, "--anchor/--no-anchor", help="Submit Merkle root to OpenTimestamps calendars."
     ),
@@ -44,9 +43,7 @@ def keygen(
     pub: Path | None = typer.Option(
         None, "--pub", help="Also write the public key (PEM) to this path."
     ),
-    force: bool = typer.Option(
-        False, "--force", help="Overwrite --out if it already exists."
-    ),
+    force: bool = typer.Option(False, "--force", help="Overwrite --out if it already exists."),
 ) -> None:
     """Generate an Ed25519 signer keypair for sealing.
 

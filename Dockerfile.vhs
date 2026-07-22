@@ -16,6 +16,9 @@ ENV PATH="/opt/venv/bin:$PATH"
 WORKDIR /build
 COPY pyproject.toml LICENSE README.md ./
 COPY src/ ./src/
+# The wheel force-includes web/verify.html (pyproject [tool.hatch...force-include]),
+# so the build context must contain it or `pip install .` fails.
+COPY web/ ./web/
 RUN pip install --no-cache-dir --prefer-binary .
 
 WORKDIR /vhs
