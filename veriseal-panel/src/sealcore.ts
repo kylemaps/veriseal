@@ -231,7 +231,11 @@ async function verifySignature(manifest: SealManifest): Promise<{ ok: boolean; e
 }
 
 function sortLeaves(leaves: readonly SealLeaf[]): SealLeaf[] {
-  // sort by (log_time, topic, leaf_hash) ascending — same as seal
+  // sort by (log_time, topic, leaf_hash) ascending — same as seal.
+  // NOTE: `<` on strings compares by UTF-16 code unit, whereas the Python
+  // reference sorts by Unicode code point. These agree for the BMP but can
+  // diverge for astral-plane (> U+FFFF) topic names. Topics are expected ASCII;
+  // do not introduce astral-plane topics without reconciling both sides.
   return leaves.slice().sort((a, b) => {
     const at = BigInt(a.log_time);
     const bt = BigInt(b.log_time);

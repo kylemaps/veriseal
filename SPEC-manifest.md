@@ -24,6 +24,10 @@ json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow
 
 > **Note:** This is NOT RFC 8785 (JCS). JCS requires Unicode escape sequences for certain code points and has additional constraints not present here.
 
+> **No floating-point numbers.** The signed payload MUST contain only integers, never floats. Python and JavaScript serialize floats differently (e.g. `1.0` vs `1`, and they disagree on precision/exponent formatting), which would make the canonical bytes — and thus the signature — diverge between a Python and a browser verifier. veriseal's schema is all-integer (nanosecond times, byte sizes, counts); `veriseal seal` rejects any float in the payload rather than emit non-portable canonical bytes.
+
+> **String ordering.** Object keys and leaf sort keys are ordered by Unicode **code point** (Python's default string comparison). A conforming verifier that compares strings by UTF-16 code unit (JavaScript's default `<`) agrees for the Basic Multilingual Plane, but can disagree for astral-plane characters (above U+FFFF). Topic strings are expected to be ASCII; do not rely on a particular ordering of astral-plane topic names.
+
 ---
 
 ## 2. Leaf preimage and leaf hash
