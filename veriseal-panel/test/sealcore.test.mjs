@@ -57,12 +57,35 @@ const sealText = readFileSync(join(here, "fixtures/sample.seal.json"), "utf8");
 
 // 2. Genuine manifest.
 const manifest = parseManifestPreservingBigInts(sealText);
+const genuineKey = manifest.signature.public_key;
+
+// Unpinned: signature + Merkle pass, but ok is false — authenticity to a real
+// identity is NOT established without an out-of-band key (SPEC 8).
 const genuine = await checkSeal(manifest);
-check("genuine manifest verifies (ok)", genuine.ok);
-check("  signature valid", genuine.signatureOk);
-check("  merkle valid", genuine.merkleOk);
+check("genuine, unpinned -> signature valid", genuine.signatureOk);
+check("genuine, unpinned -> merkle valid", genuine.merkleOk);
+check("genuine, unpinned -> NOT ok (no key pinned)", !genuine.ok);
+check("genuine, unpinned -> pubkeyPinned false", genuine.pubkeyPinned === false);
 check("  recomputed root matches the Python-signed root", genuine.recomputedRoot === EXPECTED_ROOT);
 check("  signed root == recomputed root", genuine.signedRoot === genuine.recomputedRoot);
+
+// Pinned to the correct key: fully verified.
+const pinnedOk = await checkSeal(manifest, genuineKey);
+check("genuine, correct key pinned -> ok", pinnedOk.ok);
+check("  pubkeyPinned true", pinnedOk.pubkeyPinned === true);
+check("  pubkeyOk true", pinnedOk.pubkeyOk === true);
+
+// Pinned to a DIFFERENT key: not ok, key mismatch flagged.
+const otherKey =
+  "-----BEGIN PUBLIC KEY-----\n" +
+  "MCowBQYDK2VwAyEA" +
+  "Ghr6mVpJvJ5t6b4hZ7WcM0kQwErTyUiOpAsDfGhJkL=\n" +
+  "-----END PUBLIC KEY-----\n";
+const pinnedBad = await checkSeal(manifest, otherKey);
+check("genuine, wrong key pinned -> NOT ok", !pinnedBad.ok);
+check("  pubkeyPinned true", pinnedBad.pubkeyPinned === true);
+check("  pubkeyOk false", pinnedBad.pubkeyOk === false);
+check("  signature still valid (only the pin fails)", pinnedBad.signatureOk);
 
 // 3. Flipped leaf hash.
 const flipped = parseManifestPreservingBigInts(sealText);

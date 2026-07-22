@@ -118,6 +118,21 @@
   .drop .meta { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
   .drop.loaded .role { color: var(--accent); }
 
+  /* Key pin */
+  .keypin { margin-top: 16px; }
+  .keypin .kp-label {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.09em;
+    color: var(--ink-3); font-weight: 600; display: block; margin-bottom: 6px;
+  }
+  .keypin textarea {
+    width: 100%; min-height: 64px; resize: vertical; box-sizing: border-box;
+    font-family: var(--mono); font-size: 12px; color: var(--ink);
+    background: var(--panel); border: 1px solid var(--line-strong);
+    border-radius: var(--radius); padding: 10px 12px; line-height: 1.4;
+  }
+  .keypin textarea:focus { border-color: var(--accent); outline: none; }
+  .keypin .kp-note { font-size: 12.5px; color: var(--ink-3); margin-top: 6px; max-width: 62ch; }
+
   /* Verdict */
   .verdict {
     margin-top: 26px; border-radius: 14px; border: 1px solid var(--line);
@@ -163,6 +178,7 @@
   .check.fail .mark { color: var(--bad); }
   .check.skip .mark { color: var(--idle); }
   .check.info .mark { color: var(--accent); }
+  .check.warn .mark { color: var(--warn); }
   .check .name { font-weight: 600; font-size: 14.5px; }
   .check .desc { font-size: 13px; color: var(--ink-2); margin-top: 2px; }
   .check .kv {
@@ -220,8 +236,10 @@
   <div class="neutrality">
     <span class="k">Why this matters</span>
     <span>You are checking the evidence yourself, without trusting the operator who produced
-    the log or the tool that sealed it. If this page says <strong>VERIFIED</strong>, the log
-    matches a seal made by a specific Ed25519 key &mdash; and you proved it on your own machine.</span>
+    the log or the tool that sealed it. A green <strong>VERIFIED</strong> requires you to pin the
+    signer's key (below): only then does it mean the log matches a seal made by <strong>that
+    specific signer</strong> &mdash; proved on your own machine. Without a pinned key the result
+    stays amber, because anyone could re-seal a tampered log with their own key.</span>
   </div>
 
   <div class="drops">
@@ -235,6 +253,12 @@
       <span class="hint">Drop <b>.seal.json</b> here or click to choose</span>
       <input type="file" id="file-seal" accept=".json,application/json">
     </label>
+  </div>
+
+  <div class="keypin">
+    <label class="kp-label" for="pubkey">Expected signer key &middot; PEM &middot; optional</label>
+    <textarea id="pubkey" spellcheck="false" placeholder="-----BEGIN PUBLIC KEY-----&#10;…&#10;-----END PUBLIC KEY-----"></textarea>
+    <div class="kp-note">Paste the signer's public key, obtained <b>out-of-band</b> (not from this file), to pin authenticity. Without it, a tampered log re-signed with a new key would still look valid &mdash; so a genuine-looking seal stays <b>amber</b>, never green, until you pin the key.</div>
   </div>
 
   <section class="verdict state-idle" id="verdict" aria-live="polite">
@@ -257,7 +281,7 @@
   <footer>
     <div>Verification runs client-side with the WebCrypto API (Ed25519 + SHA-256). Open the source: this file has no network calls.</div>
     <div><b>Signature</b> &mdash; the manifest is authentic to its Ed25519 key. <b>Merkle root</b> &mdash; the listed message hashes fold to the signed root. <b>File digest</b> &mdash; the log's bytes match what was sealed; any change flips this.</div>
-    <div>To pin a signer you already trust, compare the key fingerprint shown on a VERIFIED result against the one you hold out-of-band.</div>
+    <div><b>Signer key pin</b> &mdash; paste the signer's public key (obtained out-of-band) into the field above. A green VERIFIED requires it; without it the result stays amber, because the embedded key alone proves nothing about who signed.</div>
   </footer>
 </div>
 
@@ -265,7 +289,7 @@
 "use strict";
 
 /* ---- state ---- */
-const state = { mcap: null, seal: null, mcapName: null, sealName: null };
+const state = { mcap: null, seal: null, mcapName: null, sealName: null, pubkey: "" };
 
 /* ---- canonical JSON: must byte-match veriseal.canonical.canonical_json ----
    Python: json.dumps(obj, sort_keys=True, ensure_ascii=False,
@@ -382,6 +406,17 @@ function keyFingerprint(pem) {
   return bytesToHex(raw);
 }
 
+/* Raw 32-byte Ed25519 key as hex — for pinning. Compares raw key bytes so PEM
+   whitespace/encoding differences don't matter (mirrors CLI --pubkey). */
+function rawKeyHex(pem) {
+  const der = pemToDer(pem);
+  if (der.length < 32) throw new Error("not an Ed25519 SPKI key");
+  return bytesToHex(der.slice(der.length - 32));
+}
+function rawKeyHexSafe(pem) {
+  try { return rawKeyHex((pem || "").trim()); } catch (e) { return ""; }
+}
+
 async function recomputeMerkle(manifest) {
   // sort leaves by (log_time, topic, leaf_hash) — same as seal
   const leaves = manifest.leaves.slice().sort((a, b) => {
@@ -430,8 +465,31 @@ async function runVerification() {
   result.actualDigest = digest;
   result.actualSize = state.mcap.length;
 
-  result.intact = result.sigOk && result.rootOk && result.fileOk;
-  render({ status: result.intact ? "ok" : "bad", result });
+  // integrity = signature + Merkle + byte-exact file. This alone does NOT
+  // establish WHO signed: an attacker can re-seal a tampered log with their own
+  // key and pass all three. Authenticity requires pinning the signer's key.
+  const integrity = result.sigOk && result.rootOk && result.fileOk;
+  const pin = (state.pubkey || "").trim();
+  result.pinned = pin !== "";
+  if (result.pinned) {
+    try {
+      result.keyMatch = rawKeyHex(manifest.signature.public_key) === rawKeyHex(pin);
+    } catch (e) {
+      result.keyMatch = false;
+      result.pinError = "That is not a readable Ed25519 public key (PEM).";
+    }
+  } else {
+    result.keyMatch = false;
+  }
+
+  // Green only when integrity holds AND the signer key is pinned and matches.
+  result.intact = integrity && result.pinned && result.keyMatch;
+  let status;
+  if (!integrity) status = "bad";
+  else if (!result.pinned) status = "warn";      // authentic-looking but unpinned
+  else if (!result.keyMatch) status = "bad";     // wrong signer / re-signed
+  else status = "ok";
+  render({ status, result });
 }
 
 /* ---- rendering ---- */
@@ -466,7 +524,15 @@ function render(view) {
   if (view.status === "ok") {
     badge.textContent = "✓";
     title.textContent = "VERIFIED";
-    sub.innerHTML = `Independently verifiable &middot; signed by key <code style="font-family:var(--mono)">${r.fingerprint.slice(0,16)}…</code> &middot; ${r.manifest.messages.count} messages`;
+    sub.innerHTML = `Pinned signer &middot; key <code style="font-family:var(--mono)">${r.fingerprint.slice(0,16)}…</code> matches &middot; ${r.manifest.messages.count} messages`;
+  } else if (view.status === "warn") {
+    badge.textContent = "!";
+    title.textContent = "AUTHENTICITY NOT ESTABLISHED";
+    sub.innerHTML = "Signature, Merkle root, and file bytes all check out &mdash; but no signer key is pinned. A tampered log re-signed with a different key would look identical. Paste the signer's key above to establish authenticity.";
+  } else if (r.pinned && !r.keyMatch && r.sigOk && r.rootOk && r.fileOk) {
+    badge.textContent = "✗";
+    title.textContent = "SIGNER MISMATCH";
+    sub.textContent = "The log is internally consistent, but it was NOT signed by the key you pinned.";
   } else {
     badge.textContent = "✗";
     title.textContent = "TAMPERED";
@@ -497,6 +563,24 @@ function render(view) {
         r.actualSize === r.manifest.source.size_bytes ? null : "bad"]]
   ));
 
+  // signer key pin
+  if (r.pinned) {
+    checks.appendChild(checkRow(
+      r.keyMatch, "Signer key pin",
+      r.keyMatch
+        ? "The manifest's key matches the key you pinned — authentic to that signer."
+        : (r.pinError || "The manifest's key does NOT match the key you pinned — wrong signer, or re-signed after tampering."),
+      [["manifest", short(r.fingerprint), null],
+       ["pinned", r.pinError ? "unreadable" : short(rawKeyHexSafe(state.pubkey)), r.keyMatch ? "good" : "bad"]]
+    ));
+  } else {
+    checks.appendChild(checkRow(
+      "warn", "Signer key pin",
+      "No key pinned. The signature proves only that SOME key signed this manifest, not whose. Paste the signer's out-of-band key above to establish authenticity.",
+      [["manifest", short(r.fingerprint), null]]
+    ));
+  }
+
   // anchor (informational)
   const anchor = r.manifest.anchor;
   if (anchor && anchor.type === "opentimestamps") {
@@ -508,10 +592,18 @@ function render(view) {
       "No anchor in this manifest — time rests on the sealer's assertion.", []));
   }
 
-  if (!r.intact) {
+  if (view.status === "warn") {
+    const note = document.createElement("div");
+    note.className = "check warn";
+    note.innerHTML = `<span class="mark">!</span><div><div class="name">What this means</div><div class="desc">Integrity checks pass, but authenticity is not established. Pin the signer's key (paste it above) to reach a green VERIFIED. Until then, treat the signer as unproven — anyone could have produced this seal.</div></div>`;
+    checks.appendChild(note);
+  } else if (!r.intact) {
     const note = document.createElement("div");
     note.className = "check fail";
-    note.innerHTML = `<span class="mark">✗</span><div><div class="name">What this means</div><div class="desc">A VERIFIED result requires all three checks to pass. Because one failed, do not treat this log as evidence — it was modified after sealing, or the wrong file/manifest pair was loaded.</div></div>`;
+    const why = (r.pinned && !r.keyMatch && r.sigOk && r.rootOk && r.fileOk)
+      ? "The log is internally consistent but was signed by a different key than the one you pinned — a wrong signer, or a tampered log re-signed after the fact."
+      : "Because a check failed, do not treat this log as evidence — it was modified after sealing, or the wrong file/manifest pair was loaded.";
+    note.innerHTML = `<span class="mark">✗</span><div><div class="name">What this means</div><div class="desc">${why}</div></div>`;
     checks.appendChild(note);
   }
 }
@@ -523,7 +615,7 @@ function checkRow(status, name, desc, kvs) {
   const div = document.createElement("div");
   div.className = "check " + cls;
   const mark = status === true ? "✓" : status === false ? "✗"
-             : status === "info" ? "◉" : "○";
+             : status === "info" ? "◉" : status === "warn" ? "!" : "○";
   let kvHtml = "";
   if (kvs && kvs.length) {
     kvHtml = '<div class="kv">' + kvs.map(([l, v, cls2]) =>
@@ -572,6 +664,11 @@ function markLoaded(drop, kind, name, size) {
 wireDrop("drop-mcap", "file-mcap", "mcap");
 wireDrop("drop-seal", "file-seal", "seal");
 
+el("pubkey").addEventListener("input", (e) => {
+  state.pubkey = e.target.value;
+  runVerification();
+});
+
 el("reset").addEventListener("click", () => location.reload());
 
 /* ---- theme toggle passthrough already handled by tokens ---- */
@@ -582,6 +679,14 @@ el("load-sample").addEventListener("click", async () => {
   if (!s) return;
   state.mcap = hexToBytes(s.mcapHex);
   state.seal = new TextEncoder().encode(s.sealJson);
+  // Pre-pin the sample's own signer key so the demo shows a green VERIFIED (the
+  // key here plays the role of one you'd have received out-of-band). Tampering
+  // then flips it to red without touching the pin.
+  try {
+    const sampleKey = JSON.parse(s.sealJson).signature.public_key;
+    state.pubkey = sampleKey;
+    el("pubkey").value = sampleKey;
+  } catch (e) { /* leave unpinned */ }
   markLoaded(el("drop-mcap"), "mcap", "sample.mcap", state.mcap.length);
   markLoaded(el("drop-seal"), "seal", "sample.seal.json", state.seal.length);
   el("tamper").style.display = "";
