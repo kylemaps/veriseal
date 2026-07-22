@@ -196,4 +196,25 @@ A verifier without the `veriseal` library can verify a sealed manifest as follow
 8. **Tamper localisation:** diff the recomputed leaf multiset against the manifest `leaves` array to identify modified/added/removed messages.
 9. **Anchor (informational):** recompute `SHA-256(canonical_json(manifest WITHOUT "anchor"))` and compare against `anchor.commits`. Decode `anchor.ots_base64` as a `DetachedTimestampFile` and verify the OTS proof per the [OpenTimestamps specification](https://opentimestamps.org).
 
-> **Note:** steps 2–7 are independent. A re-muxed MCAP with byte-identical message payloads will fail step 2 (source sha256) but pass steps 5–7 (Merkle + signature). Both results are reported separately by `veriseal verify`.
+### 7.1 Overall verdict (normative)
+
+A seal proves the source file is byte-for-byte unchanged since sealing. The single **INTACT** verdict therefore requires **all** of:
+
+- the **source check** (step 2) passes — the file's bytes match `source.sha256`/`size_bytes`;
+- the **Merkle check** (step 6) passes;
+- the **signature check** (step 7) passes;
+- and, when the verifier was given an expected signer key out-of-band, that key matches the manifest's key (see §8).
+
+If any of these fails, the verdict is **TAMPERED**. This is the same verdict on every surface: the `veriseal verify` exit code (`0` = INTACT), the incident-pack report, the standalone web verifier, and (for the checks it can compute) the Foxglove panel. The panel is the one exception in *scope*, not in semantics: it never sees the raw file bytes, so it verifies only signature + Merkle root and explicitly labels its pass state "manifest authentic — raw file not checked in-panel," directing the reader to `veriseal verify` or the web verifier for byte integrity.
+
+> **Note:** steps 2–7 are independent *checks*, and `veriseal verify` reports each one's PASS/FAIL separately so a re-muxed MCAP with byte-identical message payloads is visibly distinguishable (it fails step 2 but passes steps 5–7). They are independent in *diagnosis* but not in *verdict*: any failing check makes the overall verdict TAMPERED.
+
+---
+
+## 8. Signer-key pinning (trust anchoring)
+
+The signature check (step 7) proves only that the manifest was signed by *whoever holds the private key named in the manifest itself* — an attacker who tampers with a log can re-hash it and re-sign with **their own** freshly generated key, and step 7 alone will still pass. Authenticity therefore requires **pinning** the signer's key: comparing the manifest's `signature.public_key` against a key the verifier obtained **out-of-band** (a fingerprint the sealing party published or handed over separately), not merely trusting the embedded key.
+
+- `veriseal verify --pubkey <key.pem>` pins the key: the raw 32-byte Ed25519 public key from the manifest must equal the raw key of the supplied PEM, or the verdict is TAMPERED.
+- When **no** key is pinned, no authenticity to a real-world identity is established. Verifiers MUST NOT present an unpinned pass as fully verified: the CLI prints a warning, and the browser verifiers render a distinct amber/neutral state ("authenticity not independently established — pin the signer's key"), never a green VERIFIED.
+- The comparison is over the raw key bytes (SPKI/PEM encoding differences do not matter), matching `veriseal verify --pubkey`.

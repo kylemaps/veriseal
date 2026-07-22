@@ -78,11 +78,20 @@ class VerificationResult:
 
     @property
     def intact(self) -> bool:
+        """Message-level integrity: the signed manifest is authentic and its
+        leaves fold to the signed root. This is NOT the full verdict — it says
+        nothing about whether the raw file on disk still matches (see `ok`)."""
         return self.sig_ok and self.root_ok
 
     @property
     def ok(self) -> bool:
-        return self.intact and self.pubkey_ok
+        """The overall INTACT verdict, identical across CLI, pack, and web
+        verifier: the manifest is authentic (`intact`), signed by the pinned key
+        if one was given (`pubkey_ok`), AND the file is byte-for-byte unchanged
+        since sealing (`source_ok`). A seal proves file integrity, so a file
+        whose bytes differ from the sealed digest is TAMPERED even if the
+        manifest itself verifies."""
+        return self.intact and self.pubkey_ok and self.source_ok
 
 
 def run_verification(
@@ -234,6 +243,13 @@ def verify_seal(
         console.print(
             f"[bold green]INTACT[/bold green]: signature valid, "
             f"{n} messages, root {root_hex[:16]}..."
+        )
+        # Show the file-integrity check affirmatively too, so the source status
+        # is ALWAYS reported (not only on failure) and INTACT visibly means the
+        # bytes on disk match the sealed digest.
+        console.print(
+            f"  [green]Source file unchanged[/green] "
+            f"(SHA-256 {result.actual_sha256[:16]}...)"
         )
     else:
         console.print("[bold red]TAMPERED[/bold red]")

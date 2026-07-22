@@ -205,16 +205,16 @@ function SealCheckPanel({ context }: { context: PanelExtensionContext }): ReactE
         <div>
           <div style={{ fontSize: 18, fontWeight: 700, color: accent, letterSpacing: "-0.01em" }}>
             {verdict === "verified"
-              ? "SEALED & AUTHENTIC"
+              ? "MANIFEST AUTHENTIC"
               : verdict === "tampered"
-                ? "SEAL INVALID"
+                ? "MANIFEST INVALID"
                 : verdict === "error"
                   ? "CANNOT CHECK"
                   : "No seal loaded"}
           </div>
           <div style={{ fontSize: 12.5, color: palette.ink2, marginTop: 2 }}>
             {verdict === "verified" && result
-              ? `Signed by key ${result.keyFingerprint.slice(0, 16)}… · ${result.messageCount} messages sealed`
+              ? `Signature valid, internally consistent · key ${result.keyFingerprint.slice(0, 16)}… · raw file not checked in-panel`
               : verdict === "tampered"
                 ? "The manifest is not internally consistent — see below."
                 : verdict === "error"
