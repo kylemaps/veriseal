@@ -42,6 +42,12 @@ export interface SealCheckResult {
   signatureOk: boolean;
   merkleOk: boolean;
   keyFingerprint: string;
+  /** True when the caller supplied an expected signer key to pin against. */
+  pubkeyPinned: boolean;
+  /** True only when a key was pinned AND it matches the manifest's key. When no
+   *  key is pinned this is false: authenticity to a real identity is NOT
+   *  established, and callers must not render a fully-verified (green) state. */
+  pubkeyOk: boolean;
   signedRoot: string;
   recomputedRoot: string;
   messageCount: number;
@@ -186,6 +192,20 @@ export function keyFingerprint(pem: string): string {
   return bytesToHex(der.slice(der.length - 32));
 }
 
+/**
+ * True iff two PEM public keys carry the same raw Ed25519 key, comparing the raw
+ * 32 key bytes so SPKI/PEM encoding whitespace differences do not matter. Mirrors
+ * `veriseal verify --pubkey`, which compares Encoding.Raw/PublicFormat.Raw bytes.
+ * Returns false if either PEM cannot be decoded.
+ */
+export function publicKeysMatch(a: string, b: string): boolean {
+  try {
+    return keyFingerprint(a) === keyFingerprint(b) && keyFingerprint(a).length === 64;
+  } catch {
+    return false;
+  }
+}
+
 async function verifySignature(manifest: SealManifest): Promise<{ ok: boolean; error?: string }> {
   const payload: Record<string, unknown> = {};
   const entries = manifest as unknown as Record<string, unknown>;
@@ -239,6 +259,8 @@ const EMPTY_RESULT: SealCheckResult = {
   signatureOk: false,
   merkleOk: false,
   keyFingerprint: "",
+  pubkeyPinned: false,
+  pubkeyOk: false,
   signedRoot: "",
   recomputedRoot: "",
   messageCount: 0,
@@ -268,7 +290,10 @@ function isSealManifest(m: unknown): m is SealManifest {
  * Verify a parsed seal manifest's internal authenticity (signature + Merkle root).
  * Accepts untrusted parsed JSON; returns an error result if it isn't a manifest.
  */
-export async function checkSeal(input: unknown): Promise<SealCheckResult> {
+export async function checkSeal(
+  input: unknown,
+  expectedPublicKeyPem?: string,
+): Promise<SealCheckResult> {
   if (!isSealManifest(input)) {
     return { ...EMPTY_RESULT, error: "Not a veriseal manifest (missing signature/merkle/leaves)." };
   }
@@ -294,7 +319,17 @@ export async function checkSeal(input: unknown): Promise<SealCheckResult> {
   base.recomputedRoot = await recomputeMerkleRoot(manifest);
   base.merkleOk = base.recomputedRoot === manifest.merkle.root;
 
-  base.ok = base.signatureOk && base.merkleOk;
+  // Signer-key pinning. Without an out-of-band key, a tampered re-seal signed
+  // with the attacker's OWN key would still pass signature+Merkle, so `ok`
+  // (a fully-verified, trust-anchored result) requires a pinned key that
+  // matches. See SPEC-manifest.md 8.
+  const pinned = expectedPublicKeyPem != null && expectedPublicKeyPem.trim() !== "";
+  base.pubkeyPinned = pinned;
+  base.pubkeyOk = pinned
+    ? publicKeysMatch(manifest.signature.public_key, expectedPublicKeyPem)
+    : false;
+
+  base.ok = base.signatureOk && base.merkleOk && base.pubkeyPinned && base.pubkeyOk;
   return base;
 }
 

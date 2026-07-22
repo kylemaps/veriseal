@@ -10,7 +10,7 @@ import {
   SealManifest,
 } from "./sealcore";
 
-type Verdict = "idle" | "verified" | "tampered" | "error";
+type Verdict = "idle" | "verified" | "unpinned" | "tampered" | "error";
 
 const palette = {
   bg: "#0e1116",
@@ -54,6 +54,7 @@ function SealCheckPanel({ context }: { context: PanelExtensionContext }): ReactE
   const [manifestName, setManifestName] = useState<string | undefined>();
   const [result, setResult] = useState<SealCheckResult | undefined>();
   const [parseError, setParseError] = useState<string | undefined>();
+  const [expectedKey, setExpectedKey] = useState<string>("");
 
   useLayoutEffect(() => {
     context.onRender = (renderState, done) => {
@@ -67,7 +68,7 @@ function SealCheckPanel({ context }: { context: PanelExtensionContext }): ReactE
     renderDone?.();
   }, [renderDone]);
 
-  const loadManifestText = useCallback(async (text: string, name: string) => {
+  const loadManifestText = useCallback((text: string, name: string) => {
     setParseError(undefined);
     setResult(undefined);
     let parsed: SealManifest;
@@ -81,9 +82,23 @@ function SealCheckPanel({ context }: { context: PanelExtensionContext }): ReactE
     }
     setManifest(parsed);
     setManifestName(name);
-    const res = await checkSeal(parsed);
-    setResult(res);
   }, []);
+
+  // Recompute whenever the manifest or the pinned key changes, so pasting a key
+  // re-runs verification against the same manifest.
+  useEffect(() => {
+    if (manifest == null) {
+      setResult(undefined);
+      return;
+    }
+    let cancelled = false;
+    void checkSeal(manifest, expectedKey).then((res) => {
+      if (!cancelled) {setResult(res);}
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [manifest, expectedKey]);
 
   const onFile = useCallback(
     (file: File | undefined) => {
@@ -92,7 +107,7 @@ function SealCheckPanel({ context }: { context: PanelExtensionContext }): ReactE
       reader.onload = () => {
         // readAsText always yields a string result
         const text = typeof reader.result === "string" ? reader.result : "";
-        void loadManifestText(text, file.name);
+        loadManifestText(text, file.name);
       };
       reader.readAsText(file);
     },
@@ -106,6 +121,9 @@ function SealCheckPanel({ context }: { context: PanelExtensionContext }): ReactE
     return crossCheckShape(manifest, { topics: loadedTopics });
   }, [manifest, loadedTopics]);
 
+  // Verdict precedence: parse/crypto error → broken signature/Merkle (tampered)
+  // → authentic-but-unpinned (amber, never green) → fully verified (pinned).
+  const internallyAuthentic = result?.signatureOk === true && result.merkleOk;
   const verdict: Verdict =
     manifest == null
       ? "idle"
@@ -113,14 +131,16 @@ function SealCheckPanel({ context }: { context: PanelExtensionContext }): ReactE
         ? "error"
         : result?.ok === true
           ? "verified"
-          : "tampered";
+          : internallyAuthentic && !result.pubkeyPinned
+            ? "unpinned"
+            : "tampered";
 
   const accent =
     verdict === "verified"
       ? palette.ok
       : verdict === "tampered"
         ? palette.bad
-        : verdict === "error"
+        : verdict === "error" || verdict === "unpinned"
           ? palette.warn
           : palette.ink3;
   const accentBg =
@@ -128,7 +148,7 @@ function SealCheckPanel({ context }: { context: PanelExtensionContext }): ReactE
       ? palette.okBg
       : verdict === "tampered"
         ? palette.badBg
-        : verdict === "error"
+        : verdict === "error" || verdict === "unpinned"
           ? palette.warnBg
           : palette.panel;
 
@@ -198,28 +218,34 @@ function SealCheckPanel({ context }: { context: PanelExtensionContext }): ReactE
             ? "✓"
             : verdict === "tampered"
               ? "✗"
-              : verdict === "error"
+              : verdict === "error" || verdict === "unpinned"
                 ? "!"
                 : "·"}
         </div>
         <div>
           <div style={{ fontSize: 18, fontWeight: 700, color: accent, letterSpacing: "-0.01em" }}>
             {verdict === "verified"
-              ? "MANIFEST AUTHENTIC"
-              : verdict === "tampered"
-                ? "MANIFEST INVALID"
-                : verdict === "error"
-                  ? "CANNOT CHECK"
-                  : "No seal loaded"}
+              ? "SIGNER VERIFIED"
+              : verdict === "unpinned"
+                ? "AUTHENTICITY NOT ESTABLISHED"
+                : verdict === "tampered"
+                  ? "MANIFEST INVALID"
+                  : verdict === "error"
+                    ? "CANNOT CHECK"
+                    : "No seal loaded"}
           </div>
           <div style={{ fontSize: 12.5, color: palette.ink2, marginTop: 2 }}>
             {verdict === "verified" && result
-              ? `Signature valid, internally consistent · key ${result.keyFingerprint.slice(0, 16)}… · raw file not checked in-panel`
-              : verdict === "tampered"
-                ? "The manifest is not internally consistent — see below."
-                : verdict === "error"
-                  ? (parseError ?? result?.error)
-                  : "Load the log's .seal.json to check it in-workflow."}
+              ? `Signature valid & pinned to your key · internally consistent · raw file not checked in-panel`
+              : verdict === "unpinned"
+                ? "Signature valid, but no signer key pinned — a tampered re-seal with a new key would look identical. Pin the signer's key below."
+                : verdict === "tampered"
+                  ? (result?.pubkeyPinned === true && !result.pubkeyOk
+                      ? "Signer key does NOT match the key you pinned."
+                      : "The manifest is not internally consistent — see below.")
+                  : verdict === "error"
+                    ? (parseError ?? result?.error)
+                    : "Load the log's .seal.json to check it in-workflow."}
           </div>
         </div>
       </div>
@@ -251,6 +277,33 @@ function SealCheckPanel({ context }: { context: PanelExtensionContext }): ReactE
         />
       </label>
 
+      {/* expected signer key (pinning) */}
+      <div style={{ marginTop: 10 }}>
+        <div style={{ fontSize: 11.5, color: palette.ink3, marginBottom: 4 }}>
+          Expected signer public key (PEM) — paste the key you were given out-of-band
+          to pin authenticity. Optional, but without it authenticity is not established.
+        </div>
+        <textarea
+          value={expectedKey}
+          spellCheck={false}
+          onChange={(e) => { setExpectedKey(e.target.value); }}
+          placeholder={"-----BEGIN PUBLIC KEY-----\n…\n-----END PUBLIC KEY-----"}
+          style={{
+            width: "100%",
+            minHeight: 56,
+            resize: "vertical",
+            boxSizing: "border-box",
+            fontFamily: palette.mono,
+            fontSize: 11,
+            color: palette.ink,
+            background: palette.panel,
+            border: `1px solid ${palette.lineStrong}`,
+            borderRadius: 8,
+            padding: "8px 10px",
+          }}
+        />
+      </div>
+
       {/* checks */}
       {result != null && result.error == null && (
         <div style={{ marginTop: 14, display: "grid", gap: 0 }}>
@@ -280,6 +333,25 @@ function SealCheckPanel({ context }: { context: PanelExtensionContext }): ReactE
               ["computed", short(result.recomputedRoot), result.merkleOk ? "good" : "bad"],
             ]}
           />
+          {result.pubkeyPinned ? (
+            <CheckRow
+              pass={result.pubkeyOk}
+              name="Signer key pin"
+              desc={
+                result.pubkeyOk
+                  ? "Manifest key matches the key you pinned."
+                  : "Manifest key does NOT match the key you pinned — wrong signer or re-signed."
+              }
+              kvs={[["manifest", short(result.keyFingerprint)]]}
+            />
+          ) : (
+            <CheckRow
+              kind="warn"
+              name="Signer key pin"
+              desc="No key pinned. Signature proves only that SOME key signed this; paste the signer's out-of-band key above to establish authenticity."
+              kvs={[["manifest", short(result.keyFingerprint)]]}
+            />
+          )}
           <CheckRow
             kind="info"
             name="Sealed window"
