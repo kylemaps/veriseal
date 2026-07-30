@@ -201,23 +201,6 @@ inspect  filter MCAP to time window → print chronological event timeline →
 
 ---
 
-## Running the demo
-
-```bash
-cd demo
-python make_sample.py          # generates sample.mcap (synthetic AV log, ~198 msgs)
-bash demo.sh                   # seal → verify INTACT → tamper → verify TAMPERED → inspect
-```
-
-To record `demo.gif` using [VHS](https://github.com/charmbracelet/vhs) (requires Docker):
-
-```bash
-docker build -f Dockerfile.vhs -t veriseal-vhs .
-docker run --rm -v "$(pwd):/vhs" veriseal-vhs demo/demo.tape
-```
-
----
-
 ## Roadmap
 
 - **v0.1:** seal / verify / inspect / pack on MCAP + OpenTimestamps anchor; independent web verifier; Foxglove panel
