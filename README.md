@@ -218,13 +218,6 @@ docker run --rm -v "$(pwd):/vhs" veriseal-vhs demo/demo.tape
 
 ---
 
-## Part of a pipeline
-
-veriseal seals telemetry; **[Rating Bridge](https://github.com/kylemaps/rating-bridge)** turns
-a sealed log into a signed, underwriting-grade exposure report; **[Agent Loss Record](https://github.com/kylemaps/agent-loss-record)**
-is the open standard incidents get recorded into. Each stands alone; together they're the
-path from "here's a robot log" to "here's what it costs to insure."
-
 ## Roadmap
 
 - **v0.1:** seal / verify / inspect / pack on MCAP + OpenTimestamps anchor; independent web verifier; Foxglove panel
