@@ -76,7 +76,10 @@ packages = ["src/veriseal"]
 [dependency-groups]
 dev = [
     "pytest>=8.0.0",
-    "ruff>=0.4.0",
+    # Pin the minor: `ruff format` gained new behaviour (formatting Python inside
+    # markdown fences) in a minor bump, which turned CI red on unrelated docs
+    # commits. Bump this deliberately, after running `ruff format .` locally.
+    "ruff>=0.16.5,<0.17",
 ]
 
 [tool.ruff]

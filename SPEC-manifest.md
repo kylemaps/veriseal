@@ -19,7 +19,9 @@ All JSON serialization in this spec uses **canonical JSON** with the following n
 In Python:
 
 ```python
-json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")
+json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode(
+    "utf-8"
+)
 ```
 
 > **Note:** This is NOT RFC 8785 (JCS). JCS requires Unicode escape sequences for certain code points and has additional constraints not present here.
@@ -84,8 +86,9 @@ k = 1 << ((n - 1).bit_length() - 1)
 The Ed25519 signature covers **canonical JSON of the manifest with `"signature"` and `"anchor"` keys removed**:
 
 ```python
-signed_payload = canonical_json({k: v for k, v in manifest.items()
-                                  if k not in ("signature", "anchor")})
+signed_payload = canonical_json(
+    {k: v for k, v in manifest.items() if k not in ("signature", "anchor")}
+)
 ```
 
 This commits to: `schema_version`, `tool_version`, `created_utc`, `source`, `messages`, `hash_alg`, `merkle` (scheme, root, ordering), and all `leaves`.

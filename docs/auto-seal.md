@@ -47,10 +47,11 @@ from launch.actions import ExecuteProcess, RegisterEventHandler
 from launch.event_handlers import OnProcessExit
 
 SEAL = (
-    'for f in drive/*.mcap; do '
+    "for f in drive/*.mcap; do "
     'veriseal seal "$f" --key ~/.veriseal/signer.key.pem --out "$f.seal.json"; '
-    'done'
+    "done"
 )
+
 
 def generate_launch_description():
     record = ExecuteProcess(
@@ -58,10 +59,12 @@ def generate_launch_description():
         output="screen",
     )
     seal = ExecuteProcess(cmd=["bash", "-c", SEAL], output="screen")
-    return LaunchDescription([
-        record,
-        RegisterEventHandler(OnProcessExit(target_action=record, on_exit=[seal])),
-    ])
+    return LaunchDescription(
+        [
+            record,
+            RegisterEventHandler(OnProcessExit(target_action=record, on_exit=[seal])),
+        ]
+    )
 ```
 
 When recording stops, the seal runs against the finished file(s).
