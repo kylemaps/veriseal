@@ -73,19 +73,33 @@ def verify_anchor(digest: bytes, ots_bytes: bytes) -> tuple[str, int | None]:
     return "pending", None
 
 
+def _walk_timestamps(ts):
+    """Yield every Timestamp node in *ts*'s tree, root first."""
+    yield ts
+    for sub in ts.ops.values():
+        yield from _walk_timestamps(sub)
+
+
 def upgrade(ots_bytes: bytes) -> bytes:
     """Ask calendars to upgrade a pending proof; return new serialized bytes."""
     ctx = BytesDeserializationContext(ots_bytes)
     dtf = DetachedTimestampFile.deserialize(ctx)
 
-    for _msg, att in list(dtf.timestamp.all_attestations()):
-        if isinstance(att, PendingAttestation):
-            try:
-                cal = RemoteCalendar(att.uri)
-                upgraded = cal.get_timestamp(dtf.file_digest, timeout=_TIMEOUT)
-                dtf.timestamp.merge(upgraded)
-            except Exception:
-                pass  # silently skip unreachable or not-yet-ready calendars
+    # A pending attestation hangs off a node DEEPER in the tree than the file
+    # digest (the calendar commits to the digest after the nonce/append ops it
+    # added). So we must (a) ask the calendar about that node's own message, and
+    # (b) merge the reply into that same node. Querying with dtf.file_digest
+    # 404s, and merging into the root raises "Can't merge timestamps for
+    # different messages together" — either way the proof stays pending forever.
+    for node in list(_walk_timestamps(dtf.timestamp)):
+        for att in list(node.attestations):
+            if isinstance(att, PendingAttestation):
+                try:
+                    cal = RemoteCalendar(att.uri)
+                    upgraded = cal.get_timestamp(node.msg, timeout=_TIMEOUT)
+                    node.merge(upgraded)
+                except Exception:
+                    pass  # silently skip unreachable or not-yet-ready calendars
 
     new_ctx = BytesSerializationContext()
     dtf.serialize(new_ctx)
