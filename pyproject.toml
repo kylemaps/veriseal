@@ -57,6 +57,10 @@ only-include = [
     "src/veriseal",
     "web/verify.html",
     "tests",
+    # The published test vectors for SPEC-manifest.md. Small (~19 KB) and shipped
+    # deliberately: tests/test_conformance_vectors.py reads them, and an sdist
+    # that carries the spec should carry the vectors that prove it.
+    "conformance",
     "docs",
     "README.md",
     "SPEC-manifest.md",
