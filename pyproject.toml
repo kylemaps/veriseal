@@ -27,10 +27,10 @@ dependencies = [
     # Upper caps guard against a future major that breaks the wire/API we rely on;
     # bump deliberately after testing against the new major.
     "mcap>=1.1.1,<2",
-    "cryptography>=42.0.0,<47",
+    "cryptography>=42.0.0,<50",
     "opentimestamps>=0.4.5,<0.5",
-    "typer>=0.12.0,<0.16",
-    "rich>=13.7.0,<15",
+    "typer>=0.12.0,<0.27",
+    "rich>=13.7.0,<16",
 ]
 
 [project.optional-dependencies]
