@@ -15,8 +15,12 @@ Type "python demo/make_sample.py"
 Enter
 Sleep 2s
 
-# 1. Seal (no anchor for deterministic demo)
-Type "veriseal seal demo/sample.mcap --no-anchor --out demo/sample.seal.json"
+# 1. Create a demo signer key, then seal (no anchor for deterministic demo)
+Type "veriseal keygen --out demo/demo.key.pem --force"
+Enter
+Sleep 2s
+
+Type "veriseal seal demo/sample.mcap --key demo/demo.key.pem --no-anchor --out demo/sample.seal.json"
 Enter
 Sleep 3s
 

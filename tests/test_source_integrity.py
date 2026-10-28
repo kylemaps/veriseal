@@ -51,7 +51,7 @@ def _write_mcap(
 
 def _seal(mcap: Path, tmp_path: Path, name: str = "s") -> Path:
     seal_path = tmp_path / f"{name}.seal.json"
-    seal(mcap, key_path=None, out_path=seal_path, do_anchor=False)
+    seal(mcap, new_key_path=mcap.with_suffix(".key.pem"), out_path=seal_path, do_anchor=False)
     return seal_path
 
 

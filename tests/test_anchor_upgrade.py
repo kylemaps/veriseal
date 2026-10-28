@@ -75,7 +75,12 @@ def anchored_seal(mcap_path: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPat
     """Seal with a fake PENDING anchor (no network) and return the seal path."""
     monkeypatch.setattr(anchor_mod, "submit", _pending_ots)
     seal_path = tmp_path / "out.seal.json"
-    seal(mcap_path, key_path=None, out_path=seal_path, do_anchor=True)
+    seal(
+        mcap_path,
+        new_key_path=mcap_path.with_suffix(".key.pem"),
+        out_path=seal_path,
+        do_anchor=True,
+    )
     return seal_path
 
 
@@ -89,7 +94,12 @@ def _anchor_digest(manifest: dict) -> bytes:
 
 def test_upgrade_none_when_no_anchor(mcap_path: Path, tmp_path: Path) -> None:
     seal_path = tmp_path / "na.seal.json"
-    seal(mcap_path, key_path=None, out_path=seal_path, do_anchor=False)
+    seal(
+        mcap_path,
+        new_key_path=mcap_path.with_suffix(".key.pem"),
+        out_path=seal_path,
+        do_anchor=False,
+    )
     manifest = json.loads(seal_path.read_bytes())
     status, height, changed = upgrade_manifest(manifest)
     assert status == "none"
@@ -181,7 +191,12 @@ def test_upgrade_mismatch_does_not_touch_manifest(
 
 def test_cli_anchor_upgrade_none_exit0(mcap_path: Path, tmp_path: Path) -> None:
     seal_path = tmp_path / "na.seal.json"
-    seal(mcap_path, key_path=None, out_path=seal_path, do_anchor=False)
+    seal(
+        mcap_path,
+        new_key_path=mcap_path.with_suffix(".key.pem"),
+        out_path=seal_path,
+        do_anchor=False,
+    )
     from typer.testing import CliRunner
 
     from veriseal.cli import app

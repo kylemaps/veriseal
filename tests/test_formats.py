@@ -68,7 +68,7 @@ def test_detect_format_unknown_raises() -> None:
 def test_seal_bag_records_format(tmp_path: Path) -> None:
     bag = _write_bag(tmp_path / "in.bag", _MESSAGES)
     seal_path = tmp_path / "in.seal.json"
-    seal(bag, key_path=None, out_path=seal_path, do_anchor=False)
+    seal(bag, new_key_path=bag.with_suffix(".key.pem"), out_path=seal_path, do_anchor=False)
     manifest = json.loads(seal_path.read_bytes())
     assert manifest["source"]["format"] == "rosbag1"
     assert manifest["source"]["filename"] == "in.bag"
@@ -78,7 +78,7 @@ def test_seal_bag_records_format(tmp_path: Path) -> None:
 def test_verify_bag_intact(tmp_path: Path) -> None:
     bag = _write_bag(tmp_path / "in.bag", _MESSAGES)
     seal_path = tmp_path / "in.seal.json"
-    seal(bag, key_path=None, out_path=seal_path, do_anchor=False)
+    seal(bag, new_key_path=bag.with_suffix(".key.pem"), out_path=seal_path, do_anchor=False)
     assert verify_seal(bag, seal_path) == 0
 
 
@@ -86,7 +86,7 @@ def test_verify_bag_tampered(tmp_path: Path) -> None:
     """A .bag with one changed message must verify as TAMPERED against the seal."""
     bag = _write_bag(tmp_path / "orig.bag", _MESSAGES)
     seal_path = tmp_path / "orig.seal.json"
-    seal(bag, key_path=None, out_path=seal_path, do_anchor=False)
+    seal(bag, new_key_path=bag.with_suffix(".key.pem"), out_path=seal_path, do_anchor=False)
 
     tampered = [
         ("/pose", _BASE + 0, "p0"),
@@ -107,7 +107,10 @@ def test_bag_and_mcap_share_pipeline(tmp_path: Path) -> None:
     from veriseal.cli import app
 
     runner = CliRunner()
-    r_seal = runner.invoke(app, ["seal", str(bag), "--no-anchor", "--out", str(seal_path)])
+    new_key = str(tmp_path / "rt.key.pem")
+    r_seal = runner.invoke(
+        app, ["seal", str(bag), "--new-key", new_key, "--no-anchor", "--out", str(seal_path)]
+    )
     assert r_seal.exit_code == 0
     r_verify = runner.invoke(app, ["verify", str(bag), str(seal_path)])
     assert r_verify.exit_code == 0

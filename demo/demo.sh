@@ -12,6 +12,7 @@ cd "$(dirname "$0")/.."
 SAMPLE=demo/sample.mcap
 SEAL=demo/sample.seal.json
 TAMPERED=demo/tampered.mcap
+KEY=demo/demo.key.pem
 
 echo "========================================"
 echo " 0. Generate synthetic sample MCAP"
@@ -20,9 +21,10 @@ python demo/make_sample.py
 
 echo
 echo "========================================"
-echo " 1. Seal (no anchor for fast demo)"
+echo " 1. Create a demo signer key, then seal (no anchor for fast demo)"
 echo "========================================"
-veriseal seal "$SAMPLE" --no-anchor --out "$SEAL"
+veriseal keygen --out "$KEY" --force > /dev/null
+veriseal seal "$SAMPLE" --key "$KEY" --no-anchor --out "$SEAL"
 
 echo
 echo "========================================"

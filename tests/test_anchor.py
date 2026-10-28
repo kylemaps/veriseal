@@ -79,7 +79,12 @@ def patched_submit(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_anchor_block_written(mcap_path: Path, tmp_path: Path, patched_submit: None) -> None:
     """seal with do_anchor=True writes an anchor dict with expected keys."""
     seal_path = tmp_path / "out.seal.json"
-    seal(mcap_path, key_path=None, out_path=seal_path, do_anchor=True)
+    seal(
+        mcap_path,
+        new_key_path=mcap_path.with_suffix(".key.pem"),
+        out_path=seal_path,
+        do_anchor=True,
+    )
     manifest = json.loads(seal_path.read_bytes())
     anchor = manifest["anchor"]
     assert anchor is not None
@@ -96,7 +101,12 @@ def test_anchor_commits_digest_correct(
 ) -> None:
     """anchor['commits'] == sha256(canonical_json(manifest WITHOUT 'anchor'))."""
     seal_path = tmp_path / "out.seal.json"
-    seal(mcap_path, key_path=None, out_path=seal_path, do_anchor=True)
+    seal(
+        mcap_path,
+        new_key_path=mcap_path.with_suffix(".key.pem"),
+        out_path=seal_path,
+        do_anchor=True,
+    )
     manifest = json.loads(seal_path.read_bytes())
 
     payload_for_anchor = {k: v for k, v in manifest.items() if k != "anchor"}
@@ -109,7 +119,12 @@ def test_anchor_ots_base64_valid(mcap_path: Path, tmp_path: Path, patched_submit
     from opentimestamps.core.serialize import BytesDeserializationContext
 
     seal_path = tmp_path / "out.seal.json"
-    seal(mcap_path, key_path=None, out_path=seal_path, do_anchor=True)
+    seal(
+        mcap_path,
+        new_key_path=mcap_path.with_suffix(".key.pem"),
+        out_path=seal_path,
+        do_anchor=True,
+    )
     manifest = json.loads(seal_path.read_bytes())
 
     ots_bytes = base64.b64decode(manifest["anchor"]["ots_base64"])
@@ -123,7 +138,12 @@ def test_anchor_ots_base64_valid(mcap_path: Path, tmp_path: Path, patched_submit
 def test_anchor_commits_to_signature(mcap_path: Path, tmp_path: Path, patched_submit: None) -> None:
     """The anchor digest covers the signature field (included in payload_for_anchor)."""
     seal_path = tmp_path / "out.seal.json"
-    seal(mcap_path, key_path=None, out_path=seal_path, do_anchor=True)
+    seal(
+        mcap_path,
+        new_key_path=mcap_path.with_suffix(".key.pem"),
+        out_path=seal_path,
+        do_anchor=True,
+    )
     manifest = json.loads(seal_path.read_bytes())
 
     # Signature must be in the payload that was hashed
@@ -136,7 +156,12 @@ def test_anchor_commits_to_signature(mcap_path: Path, tmp_path: Path, patched_su
 def test_no_anchor_leaves_null(mcap_path: Path, tmp_path: Path) -> None:
     """do_anchor=False must keep anchor=null without calling the network."""
     seal_path = tmp_path / "out.seal.json"
-    seal(mcap_path, key_path=None, out_path=seal_path, do_anchor=False)
+    seal(
+        mcap_path,
+        new_key_path=mcap_path.with_suffix(".key.pem"),
+        out_path=seal_path,
+        do_anchor=False,
+    )
     manifest = json.loads(seal_path.read_bytes())
     assert manifest["anchor"] is None
 
@@ -144,7 +169,12 @@ def test_no_anchor_leaves_null(mcap_path: Path, tmp_path: Path) -> None:
 def test_no_anchor_signature_still_valid(mcap_path: Path, tmp_path: Path) -> None:
     """Signature must be valid regardless of anchor flag."""
     seal_path = tmp_path / "out.seal.json"
-    seal(mcap_path, key_path=None, out_path=seal_path, do_anchor=False)
+    seal(
+        mcap_path,
+        new_key_path=mcap_path.with_suffix(".key.pem"),
+        out_path=seal_path,
+        do_anchor=False,
+    )
     assert verify_seal(mcap_path, seal_path) == 0
 
 
@@ -177,7 +207,12 @@ def test_tampered_manifest_anchor_invalid(
 ) -> None:
     """Changing manifest after anchoring makes the commits-digest check fail."""
     seal_path = tmp_path / "out.seal.json"
-    seal(mcap_path, key_path=None, out_path=seal_path, do_anchor=True)
+    seal(
+        mcap_path,
+        new_key_path=mcap_path.with_suffix(".key.pem"),
+        out_path=seal_path,
+        do_anchor=True,
+    )
 
     manifest = json.loads(seal_path.read_bytes())
 
@@ -195,7 +230,12 @@ def test_anchor_commits_mismatch_detected(
 ) -> None:
     """Zeroing 'commits' triggers INVALID anchor message; exit 0 (anchor is informational)."""
     seal_path = tmp_path / "out.seal.json"
-    seal(mcap_path, key_path=None, out_path=seal_path, do_anchor=True)
+    seal(
+        mcap_path,
+        new_key_path=mcap_path.with_suffix(".key.pem"),
+        out_path=seal_path,
+        do_anchor=True,
+    )
 
     manifest = json.loads(seal_path.read_bytes())
     # Zero the commits field to simulate a tampered anchor block
@@ -215,14 +255,24 @@ def test_anchor_commits_mismatch_detected(
 def test_prior_verify_intact_with_no_anchor(mcap_path: Path, tmp_path: Path) -> None:
     """Full seal/verify cycle with no anchor returns 0 (prior behaviour preserved)."""
     seal_path = tmp_path / "out.seal.json"
-    seal(mcap_path, key_path=None, out_path=seal_path, do_anchor=False)
+    seal(
+        mcap_path,
+        new_key_path=mcap_path.with_suffix(".key.pem"),
+        out_path=seal_path,
+        do_anchor=False,
+    )
     assert verify_seal(mcap_path, seal_path) == 0
 
 
 def test_prior_verify_tampered_with_no_anchor(mcap_path: Path, tmp_path: Path) -> None:
     """Payload tamper still detected when anchor is null."""
     seal_path = tmp_path / "out.seal.json"
-    seal(mcap_path, key_path=None, out_path=seal_path, do_anchor=False)
+    seal(
+        mcap_path,
+        new_key_path=mcap_path.with_suffix(".key.pem"),
+        out_path=seal_path,
+        do_anchor=False,
+    )
 
     tampered_msgs = [
         ("/pose", 1_000_000, b"\xff"),  # payload changed

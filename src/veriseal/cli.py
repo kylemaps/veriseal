@@ -23,7 +23,14 @@ console = Console()
 @app.command()
 def seal(
     path: Path = typer.Argument(..., help="Path to the log to seal (.mcap, or .bag with [ros1])."),
-    key: Path | None = typer.Option(None, "--key", help="Path to Ed25519 private key (PEM)."),
+    key: Path | None = typer.Option(
+        None, "--key", help="Existing Ed25519 signer key (PEM), e.g. from `veriseal keygen`."
+    ),
+    new_key: Path | None = typer.Option(
+        None,
+        "--new-key",
+        help="Create a new signer key at this path and seal with it. Never overwrites a file.",
+    ),
     out: Path | None = typer.Option(None, "--out", help="Output path for the .seal.json manifest."),
     anchor: bool = typer.Option(
         True, "--anchor/--no-anchor", help="Submit Merkle root to OpenTimestamps calendars."
@@ -32,7 +39,20 @@ def seal(
     """Hash every message, build a Merkle tree, sign, and write manifest."""
     from veriseal.seal import seal as do_seal
 
-    do_seal(path, key, out, do_anchor=anchor)
+    if (key is None) == (new_key is None):
+        console.print(
+            "[bold red]ERROR:[/bold red] choose one signer key: --key PATH to use an existing "
+            "key (create one once with `veriseal keygen`), or --new-key PATH to create one now."
+        )
+        raise typer.Exit(code=2)
+    if new_key is not None and new_key.exists():
+        console.print(
+            f"[bold red]ERROR:[/bold red] {new_key} already exists. Refusing to overwrite a "
+            "signer key; pass it with --key to reuse it."
+        )
+        raise typer.Exit(code=1)
+
+    do_seal(path, key, out, do_anchor=anchor, new_key_path=new_key)
 
 
 @app.command()

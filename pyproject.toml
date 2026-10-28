@@ -61,6 +61,8 @@ only-include = [
     # deliberately: tests/test_conformance_vectors.py reads them, and an sdist
     # that carries the spec should carry the vectors that prove it.
     "conformance",
+    # tests/test_readme_quickstart.py builds the README's sample log with it.
+    "demo/make_sample.py",
     "docs",
     "README.md",
     "SPEC-manifest.md",

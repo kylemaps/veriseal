@@ -5,8 +5,9 @@ optional `rosbags` reader (pure Python, no ROS installation required):
 
 ```bash
 pip install "veriseal[ros1]"
-veriseal seal drive.bag --no-anchor --out drive.seal.json
-veriseal verify drive.bag drive.seal.json        # INTACT
+veriseal keygen --out signer.key.pem --pub signer.pub.pem   # once; reuse the key
+veriseal seal drive.bag --key signer.key.pem --no-anchor --out drive.seal.json
+veriseal verify drive.bag drive.seal.json --pubkey signer.pub.pem   # INTACT
 ```
 
 The bag's messages are hashed as the same `(topic, log_time, payload)` leaves veriseal uses
@@ -47,7 +48,7 @@ mcap convert sample.bag sample.mcap
 ## Seal and verify
 
 ```bash
-veriseal seal sample.mcap --no-anchor --out sample.seal.json
+veriseal seal sample.mcap --key signer.key.pem --no-anchor --out sample.seal.json
 veriseal verify sample.mcap sample.seal.json
 # INTACT — signature valid, 10 messages, root 9a75174f...
 ```

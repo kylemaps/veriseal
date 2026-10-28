@@ -45,7 +45,12 @@ def test_reseal_with_attacker_key(tmp_path: Path) -> None:
     # 1. Genuine seal by the real signer (key1). Capture key1's public key.
     genuine = _write_mcap(tmp_path / "genuine.mcap", _GENUINE)
     genuine_seal = tmp_path / "genuine.seal.json"
-    seal(genuine, key_path=None, out_path=genuine_seal, do_anchor=False)
+    seal(
+        genuine,
+        new_key_path=genuine.with_suffix(".key.pem"),
+        out_path=genuine_seal,
+        do_anchor=False,
+    )
     real_pub = tmp_path / "real.pub.pem"
     real_pub.write_text(json.loads(genuine_seal.read_bytes())["signature"]["public_key"])
 
@@ -53,7 +58,12 @@ def test_reseal_with_attacker_key(tmp_path: Path) -> None:
     #    a fully self-consistent seal signed by a key they control.
     tampered = _write_mcap(tmp_path / "tampered.mcap", _TAMPERED)
     attacker_seal = tmp_path / "tampered.seal.json"
-    seal(tampered, key_path=None, out_path=attacker_seal, do_anchor=False)
+    seal(
+        tampered,
+        new_key_path=tampered.with_suffix(".key.pem"),
+        out_path=attacker_seal,
+        do_anchor=False,
+    )
 
     # The attacker's key MUST differ from the real signer's key.
     real_key = json.loads(genuine_seal.read_bytes())["signature"]["public_key"]

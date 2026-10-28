@@ -92,14 +92,13 @@ def test_manifest_schema_fields(sample_mcap: Path) -> None:
 
 
 def test_seal_command_writes_files(sample_mcap: Path) -> None:
-    """Smoke-test the seal() function: check it writes .seal.json and .key.pem."""
+    """Smoke-test the seal() function: it writes the .seal.json and the requested new key."""
     from veriseal.seal import seal
+    from veriseal.signing import load_private_pem, public_pem
 
     out_path = sample_mcap.parent / "out.seal.json"
-    seal(sample_mcap, key_path=None, out_path=out_path, do_anchor=False)
-    assert out_path.exists()
+    key_path = sample_mcap.parent / "signer.key.pem"
+    seal(sample_mcap, new_key_path=key_path, out_path=out_path, do_anchor=False)
     manifest = json.loads(out_path.read_bytes())
     assert manifest["messages"]["count"] == 5
-    # key.pem is written next to the mcap (same directory)
-    key_path = sample_mcap.with_suffix("").with_suffix(".key.pem")
-    assert key_path.exists()
+    assert manifest["signature"]["public_key"] == public_pem(load_private_pem(key_path))

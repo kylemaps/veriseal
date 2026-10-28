@@ -46,7 +46,7 @@ _MESSAGES: list[tuple[str, int, bytes]] = [
 def sealed_pair(tmp_path: Path) -> tuple[Path, Path]:
     mcap = _write_mcap(tmp_path / "orig.mcap", _MESSAGES)
     seal_path = tmp_path / "orig.seal.json"
-    seal(mcap, key_path=None, out_path=seal_path, do_anchor=False)
+    seal(mcap, new_key_path=mcap.with_suffix(".key.pem"), out_path=seal_path, do_anchor=False)
     return mcap, seal_path
 
 

@@ -44,7 +44,7 @@ _MSGS = [("/pose", 1_000_000, b"\x01"), ("/pose", 2_000_000, b"\x02")]
 def sealed_pair(tmp_path: Path) -> tuple[Path, Path]:
     mcap = _write_mcap(tmp_path / "orig.mcap", _MSGS)
     seal_path = tmp_path / "orig.seal.json"
-    seal(mcap, key_path=None, out_path=seal_path, do_anchor=False)
+    seal(mcap, new_key_path=mcap.with_suffix(".key.pem"), out_path=seal_path, do_anchor=False)
     return mcap, seal_path
 
 

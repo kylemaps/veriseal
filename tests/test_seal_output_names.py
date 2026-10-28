@@ -46,6 +46,5 @@ def test_seal_writes_default_names_with_dotted_stem(tmp_path: Path) -> None:
         w.add_message(channel_id=cid, log_time=1_000_000, data=b"\x01", publish_time=1_000_000)
         w.finish()
 
-    seal(mcap, key_path=None, out_path=None, do_anchor=False)
+    seal(mcap, new_key_path=mcap.with_suffix(".key.pem"), out_path=None, do_anchor=False)
     assert (tmp_path / "data.2026.seal.json").exists()
-    assert (tmp_path / "data.2026.key.pem").exists()

@@ -32,6 +32,8 @@ pip install -e .
 
 ## Quickstart
 
+No log handy? In a clone of this repo, `python demo/make_sample.py log.mcap` writes the synthetic 198-message log the outputs below come from. `tests/test_readme_quickstart.py` runs this block as written, so the outputs stay accurate.
+
 ```bash
 # Generate a reusable signer key (and its public key, to share for pinning)
 veriseal keygen --out signer.key.pem --pub signer.pub.pem
@@ -39,8 +41,8 @@ veriseal keygen --out signer.key.pem --pub signer.pub.pem
 # Seal a log (submits Merkle root to OpenTimestamps by default)
 veriseal seal log.mcap --key signer.key.pem --out log.seal.json
 
-# Seal without OpenTimestamps, fast, fully offline
-veriseal seal log.mcap --no-anchor --out log.seal.json
+# Or seal fully offline, without OpenTimestamps (same key)
+veriseal seal log.mcap --key signer.key.pem --no-anchor --out log.seal.json
 
 # Verify integrity (WARNING: without --pubkey the embedded key is trusted unconditionally)
 veriseal verify log.mcap log.seal.json
@@ -123,7 +125,7 @@ INTACT: signature valid, 198 messages, root 9bfe72f8a52c5ad5...
 Skip anchoring for offline workflows or CI:
 
 ```bash
-veriseal seal log.mcap --no-anchor
+veriseal seal log.mcap --key signer.key.pem --no-anchor
 ```
 
 Require a valid anchor (useful in audit pipelines):

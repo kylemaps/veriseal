@@ -58,7 +58,7 @@ _MSGS = [("/pose", 1_000_000, b"\x01"), ("/pose", 2_000_000, b"\x02")]
 def test_forged_anchor_commits_but_proof_binds_other_digest(tmp_path: Path) -> None:
     mcap = _write_mcap(tmp_path / "m.mcap", _MSGS)
     seal_path = tmp_path / "m.seal.json"
-    seal(mcap, key_path=None, out_path=seal_path, do_anchor=False)
+    seal(mcap, new_key_path=mcap.with_suffix(".key.pem"), out_path=seal_path, do_anchor=False)
     manifest = json.loads(seal_path.read_bytes())
 
     # The correct commit digest (what an honest anchor would commit to).
@@ -93,7 +93,7 @@ def test_honest_confirmed_anchor_passes_require_anchor(tmp_path: Path) -> None:
     """Control: a proof that genuinely binds the manifest digest passes."""
     mcap = _write_mcap(tmp_path / "h.mcap", _MSGS)
     seal_path = tmp_path / "h.seal.json"
-    seal(mcap, key_path=None, out_path=seal_path, do_anchor=False)
+    seal(mcap, new_key_path=mcap.with_suffix(".key.pem"), out_path=seal_path, do_anchor=False)
     manifest = json.loads(seal_path.read_bytes())
 
     payload = {k: v for k, v in manifest.items() if k != "anchor"}
