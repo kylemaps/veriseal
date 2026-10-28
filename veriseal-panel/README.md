@@ -18,9 +18,12 @@ A Foxglove panel only ever receives **deserialized** messages — never the raw 
 that veriseal hashes into Merkle leaves. So this panel is deliberate about its claims. It verifies:
 
 1. **Manifest signature** — the seal is authentic to its Ed25519 key (WebCrypto).
-2. **Merkle root** — the listed message hashes fold to the signed root (RFC 6962).
-3. **Sealed window** — message count, time range, and anchor status recorded in the seal.
-4. **Coverage** — flags topics loaded in this view that the seal does not cover.
+2. **Signer pin** — paste the signer's public key (obtained out-of-band) into the panel's key
+   field. The badge is green only when the seal was signed by that key; without a pinned key it
+   stays amber, because the key embedded in the seal proves nothing about who signed.
+3. **Merkle root** — the listed message hashes fold to the signed root (RFC 6962).
+4. **Sealed window** — message count, time range, and anchor status recorded in the seal.
+5. **Coverage** — flags topics loaded in this view that the seal does not cover.
 
 It does **not** recompute the whole-file SHA-256 of the `.mcap`, because a panel can't see the
 file bytes. That check — the one that catches an edited log byte-for-byte — belongs to

@@ -289,7 +289,7 @@ _README_TEMPLATE = """\
 VERISEAL INCIDENT EVIDENCE BUNDLE
 ===================================
 
-This directory is a self-contained, portable evidence package for:
+This directory is a portable evidence package for:
 
   {filename}
 

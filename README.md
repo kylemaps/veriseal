@@ -152,7 +152,7 @@ The whole point of the seal is that *someone who trusts neither the operator nor
 
 ### Incident-evidence pack
 
-`veriseal pack` bundles an already-sealed log into a portable, self-contained evidence package: the manifest, a plain-English verification report, the OpenTimestamps proof (if any, with its honest pending/confirmed state), an offline copy of the [web verifier](https://github.com/kylemaps/veriseal/blob/main/web/verify.html), and a cover sheet explaining what the seal proves — and doesn't. It re-runs the exact same verification `veriseal verify` performs (one code path, two renderings), so the report can never drift from what the CLI would say.
+`veriseal pack` builds a portable evidence package to keep alongside an already-sealed log (the log itself is not copied in, so keep the two together): the manifest, a plain-English verification report, the OpenTimestamps proof (if any, with its honest pending/confirmed state), an offline copy of the [web verifier](https://github.com/kylemaps/veriseal/blob/main/web/verify.html), and a cover sheet explaining what the seal proves — and doesn't. It re-runs the exact same verification `veriseal verify` performs (one code path, two renderings), so the report can never drift from what the CLI would say.
 
 ```bash
 veriseal pack log.mcap log.seal.json --out incident-pack/        # a directory
@@ -171,14 +171,14 @@ The pack is evidence infrastructure, not a compliance certificate: it supports d
 
 **Where neutrality actually comes from:** sealing as early as possible (ideally at/near capture) and anchoring the root in a public append-only log, so no single party (including the custodian) can backdate or alter it. The closer the seal is to capture and the more public the anchor, the more "neutral" the evidence.
 
-> **Content vs bytes:** `verify` checks message **content**, not file bytes: a losslessly re-muxed MCAP with identical messages still verifies INTACT. `source.sha256` is the separate strict byte-level check, reported alongside the Merkle result.
+> **Content vs bytes:** the Merkle root covers message **content**: each message's topic, log time and payload bytes. `source.sha256` is a separate byte-level check of the whole file, and both must pass for INTACT. A losslessly re-muxed MCAP with identical messages therefore verifies **TAMPERED**, but with only a source-digest mismatch: no Merkle mismatch and no MODIFIED/ADDED/REMOVED lines, which tells you the messages themselves are unchanged.
 
 ---
 
 ## How it works
 
 1. **Hash**: each MCAP message is domain-separated and SHA-256 hashed: `SHA-256(b"\x00" + b"veriseal-leaf-v1\x00" + len(topic) + topic + log_time + payload)`.
-2. **Merkle tree**: leaves sorted by `(log_time, topic, leaf_hash)` and combined with the [RFC 6962](https://www.rfc-editor.org/rfc/rfc6962) binary Merkle Tree Hash algorithm. Any single-byte change flips the root; the leaf diff pinpoints the affected (topic, log_time) group.
+2. **Merkle tree**: leaves sorted by `(log_time, topic, leaf_hash)` and combined with the [RFC 6962](https://www.rfc-editor.org/rfc/rfc6962) binary Merkle Tree Hash algorithm. Changing any message's topic, log time or payload changes the root, and the leaf diff pinpoints the affected (topic, log_time) group. Edits outside message content (schemas, attachments, metadata, file layout) leave the root unchanged; only the whole-file SHA-256 (`source.sha256`) catches those, and `verify` checks it too.
 3. **Sign**: the manifest (root + all leaves + metadata) is serialized as canonical JSON and signed with Ed25519. The signer's public key is embedded in the manifest.
 4. **Anchor**: the signed manifest is SHA-256 hashed and submitted to [OpenTimestamps](https://opentimestamps.org) public calendars. A Bitcoin block later commits to it, providing a trustless timestamp no single party (including the sealer) can backdate.
 

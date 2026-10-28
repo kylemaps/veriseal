@@ -14,7 +14,14 @@ Given a `.mcap` and its `.seal.json`, in the browser it:
 3. **Hashes the `.mcap` bytes** (SHA-256) and compares to `source.sha256` + `size_bytes` — this
    catches any post-seal modification of the log.
 
-All three must pass for a **VERIFIED** verdict; any failure is **TAMPERED**.
+It also has a **signer key** field: paste the signer's public key, obtained out-of-band, to pin it.
+The verdict is one of:
+
+- **VERIFIED** (green): all three checks pass and the manifest was signed by the pinned key.
+- **AUTHENTICITY NOT ESTABLISHED** (amber): all three checks pass, but no key is pinned. The
+  embedded key alone proves nothing about who signed, so a tampered re-seal would look the same.
+- **SIGNER MISMATCH**: the log is internally consistent but was not signed by the pinned key.
+- **TAMPERED**: any check fails.
 
 ## Using it
 
@@ -39,9 +46,9 @@ If the manifest format or hashing changes in the Python code, update `verify.htm
 
 - **Full-file integrity, not per-message localization.** The file-digest check catches any
   change to the log. Pinpointing *which* message changed (as `veriseal verify` does on the CLI)
-  needs an MCAP parser + decompressor, which a CSP-locked single file can't carry; the digest
-  check is the honest, format-agnostic neutrality proof.
+  needs an MCAP parser + decompressor, which this dependency-free single file doesn't carry; the
+  digest check is the honest, format-agnostic neutrality proof.
 - **Anchor status is informational here.** Confirming OpenTimestamps depth against Bitcoin is
   left to the CLI (`veriseal verify --require-anchor`).
-- To pin a signer you already trust, compare the key fingerprint on a VERIFIED result against
-  the one you hold out-of-band.
+- Pinning only helps if the key you paste really is the signer's: get it from the signer through
+  a channel the log's holder doesn't control.
