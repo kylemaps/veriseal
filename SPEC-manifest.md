@@ -212,7 +212,7 @@ A seal proves the source file is byte-for-byte unchanged since sealing. The sing
 - the **signature check** (step 7) passes;
 - and, when the verifier was given an expected signer key out-of-band, that key matches the manifest's key (see §8).
 
-If any of these fails, the verdict is **TAMPERED**. This is the same verdict on every surface: the `veriseal verify` exit code (`0` = INTACT), the incident-pack report, the standalone web verifier, and (for the checks it can compute) the Foxglove panel. The panel is the one exception in *scope*, not in semantics: it never sees the raw file bytes, so it verifies only signature + Merkle root and explicitly labels its pass state "manifest authentic — raw file not checked in-panel," directing the reader to `veriseal verify` or the web verifier for byte integrity.
+If any of these fails, the verdict is **TAMPERED**. This is the same verdict on every surface: the `veriseal verify` exit code (`0` = INTACT), the incident-pack report, the standalone web verifier, and (for the checks it can compute) the Foxglove panel. The panel is the one exception in *scope*, not in semantics: it never sees the raw file bytes, so it verifies only signature + Merkle root and explicitly labels its pass state "raw file not checked in-panel," directing the reader to `veriseal verify` or the web verifier for byte integrity.
 
 > **Note:** steps 2–7 are independent *checks*, and `veriseal verify` reports each one's PASS/FAIL separately so a re-muxed MCAP with byte-identical message payloads is visibly distinguishable (it fails step 2 but passes steps 5–7). They are independent in *diagnosis* but not in *verdict*: any failing check makes the overall verdict TAMPERED.
 

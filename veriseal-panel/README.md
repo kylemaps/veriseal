@@ -4,9 +4,13 @@ A Foxglove Studio panel that checks a [veriseal](https://github.com/kylemaps/ver
 **without leaving your visualization**. Open a log, load its `.seal.json`, and a live badge tells
 you whether the seal is authentic to its signer:
 
-> **SEALED & AUTHENTIC** — signed by key `99273cf0…` · 10 messages sealed
+> **SIGNER VERIFIED** — signature valid & pinned to your key · internally consistent · raw file not checked in-panel
 >
-> **SEAL INVALID** — the manifest is not internally consistent
+> **AUTHENTICITY NOT ESTABLISHED** — signature valid, but no signer key pinned
+>
+> **MANIFEST INVALID** — the manifest is not internally consistent, or the signer key doesn't match the one you pinned
+>
+> **CANNOT CHECK** — the seal file couldn't be parsed or checked (the reason is shown)
 
 ## What it checks (and what it doesn't)
 
