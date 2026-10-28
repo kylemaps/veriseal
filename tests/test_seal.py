@@ -96,7 +96,7 @@ def test_seal_command_writes_files(sample_mcap: Path) -> None:
     from veriseal.seal import seal
 
     out_path = sample_mcap.parent / "out.seal.json"
-    seal(sample_mcap, key_path=None, out_path=out_path)
+    seal(sample_mcap, key_path=None, out_path=out_path, do_anchor=False)
     assert out_path.exists()
     manifest = json.loads(out_path.read_bytes())
     assert manifest["messages"]["count"] == 5
