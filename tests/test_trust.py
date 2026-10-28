@@ -114,10 +114,10 @@ def test_require_anchor_fails_on_mismatched_commits(
     assert verify_seal(mcap, bad_seal, require_anchor=True) == 1
 
 
-def test_require_anchor_passes_with_mocked_pending_anchor(
+def test_require_anchor_fails_on_pending_anchor(
     sealed_pair: tuple[Path, Path], tmp_path: Path
 ) -> None:
-    """Valid commits + mocked pending OTS proof; --require-anchor must return 0."""
+    """Valid commits but only a pending OTS proof; --require-anchor must return 1."""
     mcap, seal_path = sealed_pair
     manifest = json.loads(seal_path.read_bytes())
 
@@ -138,7 +138,7 @@ def test_require_anchor_passes_with_mocked_pending_anchor(
 
     with patch("veriseal.anchor.verify_anchor", return_value=("pending", None)):
         result = verify_seal(mcap, valid_seal, require_anchor=True)
-    assert result == 0
+    assert result == 1
 
 
 # ── canonical_json correctness ───────────────────────────────────────────────

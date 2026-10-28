@@ -48,7 +48,7 @@ class AnchorResult:
 
     present: bool = False
     commits_ok: bool | None = None
-    status: str | None = None  # "pending" | "confirmed"
+    status: str | None = None  # "pending" | "confirmed" (calendar-attested, not checked)
     block_height: int | None = None
     error: str | None = None
 
@@ -220,7 +220,7 @@ def verify_seal(
 
     Returns:
         0  — INTACT (signature valid AND Merkle root matches AND pubkey/anchor checks pass)
-        1  — TAMPERED, key mismatch, or anchor required but absent/invalid
+        1  — TAMPERED, key mismatch, or --require-anchor not met
         2  — usage / parse error
     """
     try:
@@ -304,21 +304,31 @@ def verify_seal(
         anchor_fail = True
     elif result.anchor.present:
         a = result.anchor
+        proof_ok = a.error is None and a.commits_ok is not False
         if a.error is not None:
             console.print(f"  [bold red]Anchor: ERROR[/bold red]: {a.error}")
-            if require_anchor:
-                anchor_fail = True
         elif a.commits_ok is False:
             console.print(
                 "  [bold red]Anchor: INVALID[/bold red] (proof does not commit to this manifest)"
             )
-            if require_anchor:
-                anchor_fail = True
         elif a.status == "confirmed":
             console.print(
-                f"  [bold green]Anchor: confirmed[/bold green] (Bitcoin block #{a.block_height})"
+                f"  [yellow]Anchor: calendar-attested[/yellow], Bitcoin block #{a.block_height} "
+                "(not checked against Bitcoin)"
             )
         else:
-            console.print("  [cyan]Anchor: pending[/cyan] (not yet Bitcoin-confirmed)")
+            console.print(
+                "  [cyan]Anchor: pending[/cyan] (no Bitcoin attestation yet; "
+                "run `veriseal anchor upgrade` later)"
+            )
+        if require_anchor:
+            anchor_fail = True
+            if proof_ok:
+                # Nothing here fetches a Bitcoin block header, so no anchor can be
+                # verified, and an unverified attestation must never satisfy this flag.
+                console.print(
+                    "  [bold red]--require-anchor not met[/bold red]: the anchor must be checked "
+                    "against Bitcoin, which this version of veriseal cannot do yet"
+                )
 
     return 0 if (result.ok and not anchor_fail) else 1

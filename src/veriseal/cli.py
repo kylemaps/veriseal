@@ -114,8 +114,9 @@ def verify(
         False,
         "--require-anchor",
         help=(
-            "FAIL if the manifest has no anchor, if the anchor does not commit to "
-            "the recomputed digest, or if the OTS proof cannot be verified."
+            "FAIL unless the anchor commits to this manifest AND has been checked against "
+            "Bitcoin. This version cannot check against Bitcoin yet, so pending and "
+            "calendar-attested anchors both fail."
         ),
     ),
 ) -> None:
@@ -188,12 +189,12 @@ def anchor_upgrade(
         ..., help="Path to the .seal.json manifest to upgrade in place.", metavar="PATH.seal.json"
     ),
 ) -> None:
-    """Check whether a pending OpenTimestamps anchor is now Bitcoin-confirmed.
+    """Fetch a pending OpenTimestamps anchor's Bitcoin attestation from the calendars.
 
-    Asks the public calendars; if a Bitcoin block now includes the proof, the
-    manifest's anchor block is updated in place (status -> confirmed, block height
-    recorded). The anchor is excluded from the signed payload, so this never
-    invalidates the signature.
+    If a calendar now returns a Bitcoin block attestation, the manifest's anchor block
+    is updated in place (status -> confirmed, block height recorded). That records the
+    calendar's answer; it is not a check against Bitcoin. The anchor is excluded from
+    the signed payload, so this never invalidates the signature.
     """
     import json
 
@@ -230,7 +231,8 @@ def anchor_upgrade(
 
     if status == "confirmed":
         console.print(
-            f"[bold green]Anchor confirmed[/bold green] in Bitcoin block #{height}. "
+            f"[green]Calendar returned a Bitcoin attestation[/green] for block #{height} "
+            "(not checked against Bitcoin). "
             + ("Manifest updated." if changed else "Manifest already recorded this.")
         )
     else:

@@ -588,7 +588,7 @@ function render(view) {
   const anchor = r.manifest.anchor;
   if (anchor && anchor.type === "opentimestamps") {
     checks.appendChild(checkRow("info", "Timestamp anchor",
-      "An OpenTimestamps proof is embedded (Bitcoin-anchored time). Confirm depth with the veriseal CLI.",
+      "An OpenTimestamps proof is embedded. This page does not check it against Bitcoin, so treat the sealed time as claimed, not proven.",
       [["type", "opentimestamps", null]]));
   } else {
     checks.appendChild(checkRow("skip", "Timestamp anchor",

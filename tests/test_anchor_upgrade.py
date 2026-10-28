@@ -218,7 +218,7 @@ def test_cli_anchor_upgrade_confirmed_writes_back(
 
     result = CliRunner().invoke(app, ["anchor", "upgrade", str(anchored_seal)])
     assert result.exit_code == 0
-    assert "confirmed" in result.stdout.lower()
+    assert "not checked against bitcoin" in " ".join(result.stdout.lower().split())
     written = json.loads(anchored_seal.read_bytes())
     assert written["anchor"]["status"] == "confirmed"
     assert written["anchor"]["bitcoin_block_height"] == 812_345

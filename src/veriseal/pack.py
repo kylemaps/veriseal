@@ -100,21 +100,21 @@ def _anchor_report_lines(result: VerificationResult) -> list[str]:
         lines.append("  Anchor proof INVALID: does not commit to this manifest.")
         lines.append("  Do not treat the sealed time as proven; treat it as asserted only.")
     elif a.status == "confirmed":
-        lines.append(f"  Status: CONFIRMED in Bitcoin block #{a.block_height}")
-        lines.append(
-            "  A Bitcoin block header attests that the sealed Merkle root existed no later"
-        )
-        lines.append("  than that block's timestamp. This is an independent, public timestamp.")
+        lines.append(f"  Status: CALENDAR-ATTESTED, Bitcoin block #{a.block_height}")
+        lines.append("  NOT CHECKED AGAINST BITCOIN. An OpenTimestamps calendar supplied an")
+        lines.append("  attestation that this block commits to the sealed manifest, but veriseal")
+        lines.append("  has not compared it with the block itself. Until someone does (e.g. with")
+        lines.append("  the OpenTimestamps client and a Bitcoin node, using anchor.ots), treat the")
+        lines.append("  sealed time as claimed, not proven.")
     else:
-        lines.append("  Status: PENDING attestation (not yet confirmed in a Bitcoin block)")
+        lines.append("  Status: PENDING attestation (no Bitcoin attestation yet)")
         lines.append(
             "  A calendar server has acknowledged the submission, but no Bitcoin block has"
         )
         lines.append(
-            "  yet included it. Do not describe this log as 'anchored' or 'Bitcoin-timestamped'"
+            "  yet included it. Do not describe this log as 'anchored' or 'Bitcoin-timestamped'."
         )
-        lines.append("  until the status above reads CONFIRMED — re-run `veriseal verify` later,")
-        lines.append("  or `veriseal pack` again, to check for confirmation.")
+        lines.append("  Run `veriseal anchor upgrade` later to fetch the attestation.")
     submitted = manifest_anchor.get("submitted_utc")
     if submitted:
         lines.append(f"  Submitted: {submitted}")
@@ -235,8 +235,10 @@ WHAT THE SEAL PROVES
      message).
   2. AUTHENTICITY TO A KEY — the manifest was produced by whoever holds the
      Ed25519 private key named in this bundle (digital signature).
-  3. (If an anchor is present and CONFIRMED) INDEPENDENT TIMESTAMP — a public
-     Bitcoin block attests the sealed content existed no later than that block.
+  3. (If an anchor is present) A TIMESTAMP CLAIM — an OpenTimestamps proof that a
+     Bitcoin block commits to the sealed content. Once checked against that block,
+     it shows the content existed no later than the block; report.txt says whether
+     veriseal checked it.
 
 WHAT THE SEAL DOES NOT PROVE
 ------------------------------

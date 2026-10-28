@@ -3,8 +3,9 @@
 A doctored anchor whose `commits` field is edited to match the manifest but whose
 `ots_base64` proof actually binds a DIFFERENT digest must be rejected under
 --require-anchor. The commits string alone is attacker-controlled text; the proof
-bytes are what bind a digest, and verify_anchor cross-checks them. This exercises
-the real OpenTimestamps deserialization path, not a stub.
+bytes are what bind a digest, and verify_anchor cross-checks them. A proof that binds
+the right digest to a made-up Bitcoin attestation must not pass either: without a check
+against the Bitcoin block header it is only a claim.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ import hashlib
 import json
 from pathlib import Path
 
+import pytest
 from mcap.writer import Writer
 from opentimestamps.core.notary import BitcoinBlockHeaderAttestation
 from opentimestamps.core.op import OpSHA256
@@ -89,8 +91,8 @@ def test_forged_anchor_commits_but_proof_binds_other_digest(tmp_path: Path) -> N
     assert verify_seal(mcap, forged_seal, require_anchor=True) == 1
 
 
-def test_honest_confirmed_anchor_passes_require_anchor(tmp_path: Path) -> None:
-    """Control: a proof that genuinely binds the manifest digest passes."""
+def _seal_with_made_up_attestation(tmp_path: Path) -> tuple[Path, Path]:
+    """A proof that binds the right digest to a Bitcoin attestation no block ever made."""
     mcap = _write_mcap(tmp_path / "h.mcap", _MSGS)
     seal_path = tmp_path / "h.seal.json"
     seal(mcap, new_key_path=mcap.with_suffix(".key.pem"), out_path=seal_path, do_anchor=False)
@@ -98,18 +100,43 @@ def test_honest_confirmed_anchor_passes_require_anchor(tmp_path: Path) -> None:
 
     payload = {k: v for k, v in manifest.items() if k != "anchor"}
     digest = hashlib.sha256(canonical_json(payload)).digest()
-    honest_ots = _confirmed_ots(digest, 820001)
+    made_up_ots = _confirmed_ots(digest, 820001)
 
     manifest["anchor"] = {
         "type": "opentimestamps",
         "commitment_alg": "SHA-256",
         "commits": digest.hex(),
-        "ots_base64": base64.b64encode(honest_ots).decode("ascii"),
+        "ots_base64": base64.b64encode(made_up_ots).decode("ascii"),
         "status": "confirmed",
         "bitcoin_block_height": 820001,
         "submitted_utc": "2026-01-01T00:00:00Z",
     }
-    honest_seal = tmp_path / "honest.seal.json"
-    honest_seal.write_bytes(canonical_json(manifest))
+    made_up_seal = tmp_path / "made_up.seal.json"
+    made_up_seal.write_bytes(canonical_json(manifest))
+    return mcap, made_up_seal
 
-    assert verify_seal(mcap, honest_seal, require_anchor=True) == 0
+
+def test_unchecked_bitcoin_attestation_fails_require_anchor(tmp_path: Path) -> None:
+    """Nothing here checks the attestation against Bitcoin, so it must not satisfy the flag."""
+    mcap, made_up_seal = _seal_with_made_up_attestation(tmp_path)
+    assert verify_seal(mcap, made_up_seal, require_anchor=True) == 1
+
+
+def test_unchecked_attestation_is_reported_as_calendar_attested(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    mcap, made_up_seal = _seal_with_made_up_attestation(tmp_path)
+    assert verify_seal(mcap, made_up_seal) == 0  # anchors stay informational by default
+    out = " ".join(capsys.readouterr().out.split())
+    assert "Anchor: calendar-attested, Bitcoin block #820001 (not checked against Bitcoin)" in out
+    assert "confirmed" not in out.lower()
+
+
+def test_pack_report_does_not_vouch_for_unchecked_attestation(tmp_path: Path) -> None:
+    from veriseal.pack import build_pack
+
+    mcap, made_up_seal = _seal_with_made_up_attestation(tmp_path)
+    result = build_pack(mcap, made_up_seal, tmp_path / "pack")
+    report = (result.out / "report.txt").read_text(encoding="utf-8")
+    assert "NOT CHECKED AGAINST BITCOIN" in report
+    assert "independent, public timestamp" not in report

@@ -2,7 +2,7 @@
 
 For incident investigators and safety teams who need to prove a robot/autonomy log wasn't altered after the fact.
 
-A CLI that seals a robot/autonomy log (MCAP) with an Ed25519 signature and a Bitcoin timestamp (OpenTimestamps), producing a `.seal.json` manifest. A disinterested party can later prove "this log matches a seal made by key K, anchored at time T", but only if the verifier **pins the signer's key** (`--pubkey`). Without key pinning, a tampered re-seal with a new key still passes.
+A CLI that seals a robot/autonomy log (MCAP) with an Ed25519 signature and an OpenTimestamps proof anchored in Bitcoin, producing a `.seal.json` manifest. A disinterested party can later prove "this log matches a seal made by key K", but only if the verifier **pins the signer's key** (`--pubkey`). Without key pinning, a tampered re-seal with a new key still passes. The seal also carries an OpenTimestamps proof that it existed no later than a given Bitcoin block; that holds once the proof is checked against Bitcoin, which veriseal doesn't do yet.
 
 > **Status:** early v0.1, solo project: seal/verify/inspect/pack work end-to-end, but APIs may change. Adversarial feedback welcome: [open an issue](https://github.com/kylemaps/veriseal/issues).
 
@@ -105,21 +105,22 @@ veriseal inspect log.mcap \
 veriseal pack log.mcap log.seal.json --out incident-pack/
 veriseal pack log.mcap log.seal.json --out incident-pack --zip   # single .zip to hand off
 
-# Later, check whether a pending Bitcoin timestamp has been confirmed
+# Later, fetch a pending timestamp's Bitcoin attestation from the calendars
 veriseal anchor upgrade log.seal.json
 ```
 
 ### OpenTimestamps anchor
 
-By default, `veriseal seal` submits the signed Merkle root to public Bitcoin calendar servers ([OpenTimestamps](https://opentimestamps.org)). The embedded proof starts as `status: "pending"` and becomes `"confirmed"` once a Bitcoin block includes the Merkle path (typically a few hours later).
+By default, `veriseal seal` submits the signed manifest's digest to public [OpenTimestamps](https://opentimestamps.org) calendar servers. The embedded proof starts as `status: "pending"`. Once a Bitcoin block includes the calendar's commitment (typically a few hours later), `veriseal anchor upgrade log.seal.json` fetches the Bitcoin attestation from the calendars and records it in place (`status` -> `confirmed`, block height recorded). The anchor is excluded from the signed payload, so this never invalidates the signature.
 
-To pull that confirmation into the manifest once it lands, run `veriseal anchor upgrade log.seal.json`: it asks the calendars whether the proof is now in a Bitcoin block and, if so, updates the anchor block in place (`status` -> `confirmed`, block height recorded). The anchor is excluded from the signed payload, so this never invalidates the signature. It never records a confirmation the proof does not actually carry.
+**Trust model.** An OpenTimestamps proof is a chain of SHA-256 steps from the manifest's digest to the Merkle root in one Bitcoin block header. Checked against that header, it shows the manifest existed no later than that block, without trusting the calendars, the sealer or veriseal. Unchecked, it is only the calendar's claim. veriseal does not check it against Bitcoin yet, so `verify` reports the anchor as **calendar-attested, not checked against Bitcoin**. Until it can, check the proof (`veriseal pack` writes it out as `anchor.ots`) with the OpenTimestamps client and a Bitcoin node.
 
-`veriseal verify` reports anchor status **informational**: the INTACT/TAMPERED verdict and exit code are unaffected by anchor state unless `--require-anchor` is set:
+`veriseal verify` reports the anchor for information only. It doesn't change the INTACT/TAMPERED verdict or the exit code unless `--require-anchor` is set:
 
 ```
 INTACT: signature valid, 198 messages, root 9bfe72f8a52c5ad5...
-  Anchor: pending (not yet Bitcoin-confirmed)
+  Source file unchanged (SHA-256 79d83f92510271e5...)
+  Anchor: calendar-attested, Bitcoin block #812345 (not checked against Bitcoin)
 ```
 
 Skip anchoring for offline workflows or CI:
@@ -128,7 +129,7 @@ Skip anchoring for offline workflows or CI:
 veriseal seal log.mcap --key signer.key.pem --no-anchor
 ```
 
-Require a valid anchor (useful in audit pipelines):
+`--require-anchor` fails unless the anchor has been checked against Bitcoin. veriseal can't do that check yet, so for now it fails for every anchor, pending or calendar-attested, rather than accept one it hasn't verified:
 
 ```bash
 veriseal verify log.mcap log.seal.json --pubkey signer.pub.pem --require-anchor
@@ -152,7 +153,7 @@ The whole point of the seal is that *someone who trusts neither the operator nor
 
 ### Incident-evidence pack
 
-`veriseal pack` builds a portable evidence package to keep alongside an already-sealed log (the log itself is not copied in, so keep the two together): the manifest, a plain-English verification report, the OpenTimestamps proof (if any, with its honest pending/confirmed state), an offline copy of the [web verifier](https://github.com/kylemaps/veriseal/blob/main/web/verify.html), and a cover sheet explaining what the seal proves — and doesn't. It re-runs the exact same verification `veriseal verify` performs (one code path, two renderings), so the report can never drift from what the CLI would say.
+`veriseal pack` builds a portable evidence package to keep alongside an already-sealed log (the log itself is not copied in, so keep the two together): the manifest, a plain-English verification report, the OpenTimestamps proof (if any, with its honest pending/calendar-attested state), an offline copy of the [web verifier](https://github.com/kylemaps/veriseal/blob/main/web/verify.html), and a cover sheet explaining what the seal proves — and doesn't. It re-runs the exact same verification `veriseal verify` performs (one code path, two renderings), so the report can never drift from what the CLI would say.
 
 ```bash
 veriseal pack log.mcap log.seal.json --out incident-pack/        # a directory
@@ -165,7 +166,7 @@ The pack is evidence infrastructure, not a compliance certificate: it supports d
 
 ## Threat model
 
-**What it PROVES:** this log matches a seal made by key K at time T. "Independently verifiable" requires two things: (1) the verifier knows and pins the signer's public key (`--pubkey`); (2) the anchor is trusted. Without `--pubkey`, a tampered re-seal with a fresh key still passes. Without the anchor, time claims rest only on the sealer's assertion.
+**What it PROVES:** this log matches a seal made by key K at time T. "Independently verifiable" requires two things: (1) the verifier knows and pins the signer's public key (`--pubkey`); (2) the anchor has been checked against Bitcoin. Without `--pubkey`, a tampered re-seal with a fresh key still passes. Without a checked anchor, time claims rest only on the sealer's (or the calendar's) assertion.
 
 **What it does NOT prove:** that the log is a truthful record of physical reality at capture time. A seal cannot un-fabricate data captured falsely. Integrity ≠ veracity.
 
@@ -180,7 +181,7 @@ The pack is evidence infrastructure, not a compliance certificate: it supports d
 1. **Hash**: each MCAP message is domain-separated and SHA-256 hashed: `SHA-256(b"\x00" + b"veriseal-leaf-v1\x00" + len(topic) + topic + log_time + payload)`.
 2. **Merkle tree**: leaves sorted by `(log_time, topic, leaf_hash)` and combined with the [RFC 6962](https://www.rfc-editor.org/rfc/rfc6962) binary Merkle Tree Hash algorithm. Changing any message's topic, log time or payload changes the root, and the leaf diff pinpoints the affected (topic, log_time) group. Edits outside message content (schemas, attachments, metadata, file layout) leave the root unchanged; only the whole-file SHA-256 (`source.sha256`) catches those, and `verify` checks it too.
 3. **Sign**: the manifest (root + all leaves + metadata) is serialized as canonical JSON and signed with Ed25519. The signer's public key is embedded in the manifest.
-4. **Anchor**: the signed manifest is SHA-256 hashed and submitted to [OpenTimestamps](https://opentimestamps.org) public calendars. A Bitcoin block later commits to it, providing a trustless timestamp no single party (including the sealer) can backdate.
+4. **Anchor**: the signed manifest is SHA-256 hashed and submitted to [OpenTimestamps](https://opentimestamps.org) public calendars. A Bitcoin block later commits to it. Checked against that block's header, this shows the manifest existed no later than the block, with no trust in the calendars or the sealer; veriseal doesn't perform that check yet (see the trust model under [OpenTimestamps anchor](#opentimestamps-anchor)).
 
 The `.seal.json` format is fully documented in **[SPEC-manifest.md](https://github.com/kylemaps/veriseal/blob/main/SPEC-manifest.md)**: a conforming verifier needs only that document, the MCAP, and standard crypto libraries.
 
@@ -194,7 +195,7 @@ seal     ingest MCAP → hash every message → RFC 6962 Merkle tree →
 
 verify   recompute Merkle tree from MCAP → check signature → compare roots →
          INTACT or TAMPERED (locate modified/added/removed messages)
-         informational: anchor status (pending / confirmed / invalid)
+         informational: anchor status (pending / calendar-attested / invalid)
          optional: --pubkey to pin the signer's key, --require-anchor to enforce anchor
 
 inspect  filter MCAP to time window → print chronological event timeline →

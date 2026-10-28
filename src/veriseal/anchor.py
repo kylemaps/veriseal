@@ -49,10 +49,11 @@ def submit(digest: bytes) -> bytes:
 
 
 def verify_anchor(digest: bytes, ots_bytes: bytes) -> tuple[str, int | None]:
-    """Verify *ots_bytes* against *digest*.
+    """Check that *ots_bytes* commits to *digest*, and report what the proof claims.
 
     Returns (status, bitcoin_block_height_or_None) where status is:
-      "confirmed" — at least one Bitcoin block attestation is present
+      "confirmed" — the proof carries a Bitcoin block attestation, as supplied by a
+                    calendar. NOT checked against Bitcoin: no block header is fetched.
       "pending"   — only calendar (pending) attestations present
 
     Raises ValueError if the embedded proof digest does not match *digest*.
@@ -117,7 +118,8 @@ def upgrade_manifest(manifest: dict) -> tuple[str, int | None, bool]:
       - ``status``: ``"none"`` (no OTS anchor), ``"mismatch"`` (the proof does not
         commit to this manifest — altered file or wrong proof), ``"pending"``
         (acknowledged by a calendar but not yet in a Bitcoin block), or
-        ``"confirmed"``.
+        ``"confirmed"`` (a calendar supplied a Bitcoin attestation; not checked against
+        Bitcoin).
       - ``block_height``: the Bitcoin block height if confirmed, else ``None``.
       - ``changed``: whether the manifest's anchor block was modified (new proof
         bytes and/or a newly-recorded confirmation) and should be written back.
