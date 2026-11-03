@@ -8,9 +8,10 @@
   ESTABLISHED** (valid but no key pinned), **MANIFEST INVALID** (inconsistent manifest, or a
   key other than the pinned one), and **CANNOT CHECK** (the seal file couldn't be parsed or
   checked).
-- The seal file is parsed as strictly as the Python reference: a non-integer number such as
-  `1.7e18`, or a malformed string, is rejected with the reason shown, instead of being read as
-  an integer. Shares its test cases with the web verifier (`conformance/parse-cases.json`).
+- Seal files are parsed as strictly as the Python reference parses them. A number with a
+  fraction or exponent, such as `1.7e18`, is rejected with the reason shown instead of being
+  read as an integer, and so is a string that is not valid Unicode. The test cases are shared
+  with the web verifier (`conformance/parse-cases.json`).
 
 ## 0.1.0
 

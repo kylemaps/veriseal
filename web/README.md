@@ -52,11 +52,11 @@ the inputs that must be accepted or rejected; the tests run the page's own parse
 The page renders values read from the files it checks, so it treats them as hostile:
 
 - The page is built with text nodes only (no `innerHTML`), so a value such as
-  `<img src=x onerror=alert(1)>` in a seal file is shown as text, never run.
-- A `Content-Security-Policy` meta tag allows nothing but the page's own inline script and style,
-  pinned by SHA-256 hash: no network requests, no other scripts, no inline event handlers. If you
-  edit the `<script>` or `<style>`, update the hashes; `tests/test_web_verifier_hardening.py`
-  fails and prints the new policy.
+  `<img src=x onerror=alert(1)>` in a seal file appears on the page as plain text.
+- A `Content-Security-Policy` meta tag allows only the page's own inline script and style,
+  pinned by SHA-256 hash, so the page cannot make network requests, load other scripts or run
+  inline event handlers. If you edit the `<script>` or `<style>`, update the hashes;
+  `tests/test_web_verifier_hardening.py` fails and prints the new policy.
 
 ## Scope / limitations
 

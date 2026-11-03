@@ -11,9 +11,8 @@
 ### Added
 
 - `verify --check-bitcoin` and `pack --check-bitcoin`: check the anchor's Bitcoin attestation against the block header, fetched from mempool.space and blockstream.info, which must agree. The result is "verified against Bitcoin" (with block hash and time), "FALSE" (the block doesn't contain the proof) or "could not check" (with the reason).
-- `verify --allow-unpinned`.
 - `bench/measure.py`: measures what sealing costs on a given computer (time, CPU, peak memory, and energy where a power sensor exists: Jetson, Raspberry Pi 5, Intel RAPL, battery). See `bench/README.md`.
-- `keygen --key-passphrase-env VAR` and `seal --key-passphrase-env VAR`: encrypt the signer key with a passphrase read from an environment variable, and use it.
+- `--key-passphrase-env VAR`: `keygen` encrypts the new key with the passphrase in environment variable `VAR`, and `seal` uses it to decrypt the key.
 
 ### Changed
 

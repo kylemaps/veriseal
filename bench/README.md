@@ -1,17 +1,15 @@
 # Measuring veriseal on a robot
 
-`measure.py` answers one question: what does sealing a log cost on this computer? Run it on the
-robot's own computer, with logs the robot recorded, and send back the results file.
+`measure.py` measures what sealing a log costs on the computer it runs on. Run it on the robot's
+own computer, with logs the robot recorded, and send back the results file.
 
 ## What it measures
 
 For each log, a few times over, it runs the real `veriseal seal` (offline, no timestamp
-submission) and `veriseal verify`, each as its own process, and records:
-
-- **time**: wall-clock and CPU seconds;
-- **memory**: the peak memory of that process;
-- **energy**, if the computer has a power sensor: average power while sealing, minus average
-  power while idle, times the sealing time. That is the extra energy sealing takes.
+submission) and `veriseal verify`, each as its own process, and records the wall-clock time, the
+CPU time and the peak memory of each run. If the computer has a power sensor, it also records the
+extra energy sealing takes: average power while sealing minus average power while idle, times
+the sealing time.
 
 It finds a power sensor by itself, in this order:
 

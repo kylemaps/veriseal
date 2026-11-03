@@ -100,7 +100,7 @@ exact. The Python reference, the web verifier and the Foxglove panel are all tes
 Checks the Bitcoin step of SPEC-manifest.md §6. It holds a real proof from the public
 OpenTimestamps calendars for the SHA-256 of a short message, and the 80-byte header of the
 block the proof names (block 974347, as served by mempool.space and blockstream.info). Running
-the proof's operations from the digest must give that header's Merkle root (bytes 36–68), and
+the proof's operations from the digest must give that header's Merkle root (bytes 36 to 68), and
 the header must hash to `block_hash`. Changing any bit of the header's Merkle root must make
 the check fail.
 

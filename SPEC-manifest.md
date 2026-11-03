@@ -28,7 +28,7 @@ json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow
 
 > **No floating-point numbers.** The signed payload MUST contain only integers, never floats. Python and JavaScript serialize floats differently (e.g. `1.0` vs `1`, and they disagree on precision/exponent formatting), which would make the canonical bytes — and thus the signature — diverge between a Python and a browser verifier. veriseal's schema is all-integer (nanosecond times, byte sizes, counts); `veriseal seal` rejects any float in the payload rather than emit non-portable canonical bytes.
 
-> **Parsing.** A verifier MUST reject a manifest that the reference would reject, not repair it. In particular it MUST reject any number written with a fraction or exponent (`1.0`, `1.7e18`), even when its value is a whole number, because the reference reads it as a float and refuses it; it MUST keep integers above 2^53 exact; and it MUST reject strings that are not well-formed Unicode (a lone surrogate such as `"\ud800"`), which cannot be encoded as UTF-8. [`conformance/parse-cases.json`](conformance/parse-cases.json) lists inputs and the canonical bytes (or rejection) each must produce.
+> **Parsing.** A verifier MUST reject every manifest the reference rejects, even when it could read a sensible value from it. In particular it MUST reject any number written with a fraction or exponent (`1.0`, `1.7e18`), even when its value is a whole number, because the reference reads it as a float and refuses it; it MUST keep integers above 2^53 exact; and it MUST reject strings that are not well-formed Unicode (a lone surrogate such as `"\ud800"`), which cannot be encoded as UTF-8. [`conformance/parse-cases.json`](conformance/parse-cases.json) lists inputs and the canonical bytes (or rejection) each must produce.
 
 > **String ordering.** Object keys and leaf sort keys are ordered by Unicode **code point** (Python's default string comparison). A conforming verifier that compares strings by UTF-16 code unit (JavaScript's default `<`) agrees for the Basic Multilingual Plane, but can disagree for astral-plane characters (above U+FFFF). Topic strings are expected to be ASCII; do not rely on a particular ordering of astral-plane topic names.
 
@@ -190,8 +190,8 @@ When `status` is `"pending"`, the `bitcoin_block_height` key is absent. `verisea
 The reference CLI performs this check with `veriseal verify --check-bitcoin` (implied by `--require-anchor`). For each `BitcoinBlockHeaderAttestation` in the proof, with message `msg` (the result of the proof's operations at that node) and block height `h`:
 
 1. Ask each of two independent block sources (Esplora API: `GET /block-height/{h}`, then `GET /block/{hash}/header`) for the block at `h`. Each must answer; the hash must be 64 lower-case hex characters; the header must be 80 bytes and its double SHA-256, byte-reversed, must equal that hash; and all sources must return the same header. Otherwise the result is *unchecked*.
-2. The attestation is *verified* if `msg` equals bytes 36–68 of the header (its Merkle root field, in serialized byte order), and *false* otherwise.
-3. The anchor's result is the lowest verified height if any; else *false* if any attestation was false; else *unchecked*. The header's time field (bytes 68–72, little-endian Unix seconds) is reported as the block time.
+2. The attestation is *verified* if `msg` equals bytes 36 to 68 of the header (its Merkle root field, in serialized byte order), and *false* otherwise.
+3. The anchor's result is the lowest verified height if any; else *false* if any attestation was false; else *unchecked*. The header's time field (bytes 68 to 72, little-endian Unix seconds) is reported as the block time.
 
 Without the check, the CLI reports a Bitcoin attestation as "calendar-attested, not checked against Bitcoin". `--require-anchor` passes only for *verified*.
 
