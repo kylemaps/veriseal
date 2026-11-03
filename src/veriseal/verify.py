@@ -155,11 +155,10 @@ def run_verification(
         raw_manifest = manifest_key.public_bytes(Encoding.Raw, PublicFormat.Raw)
         pubkey_ok = raw_expected == raw_manifest
 
-    # ── Recompute leaves from MCAP ────────────────────────────────────────────
-    raw_messages = list(iter_messages(mcap_path))
+    # ── Recompute leaves from MCAP (hashed as read; payloads are not kept) ────
     recomputed_entries = [
         (topic, log_time, leaf_hash(topic, log_time, payload).hex())
-        for topic, log_time, payload in raw_messages
+        for topic, log_time, payload in iter_messages(mcap_path)
     ]
     manifest_entries = [
         (leaf["topic"], leaf["log_time"], leaf["leaf_hash"]) for leaf in manifest["leaves"]

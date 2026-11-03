@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -15,7 +16,7 @@ from veriseal.signing import public_pem, sign
 
 def build_manifest(
     path: Path,
-    messages: list[tuple[str, int, bytes]],
+    messages: Iterable[tuple[str, int, bytes]],
     file_sha256: str,
     file_size: int,
     key: Ed25519PrivateKey,
@@ -24,6 +25,9 @@ def build_manifest(
 ) -> dict:
     """
     Construct and sign the veriseal manifest.
+
+    *messages* is read once and each payload is dropped after hashing, so it can be a
+    generator over a log far larger than memory.
 
     Leaf ordering: (log_time_ns, topic, leaf_hash_hex) ascending.
     Signed payload = canonical_json(manifest without 'signature' and 'anchor' keys).
@@ -67,7 +71,7 @@ def build_manifest(
             "size_bytes": file_size,
         },
         "messages": {
-            "count": len(messages),
+            "count": len(raw_leaves),
             "log_time_min": min(log_times) if log_times else 0,
             "log_time_max": max(log_times) if log_times else 0,
         },

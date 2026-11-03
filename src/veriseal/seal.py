@@ -59,14 +59,17 @@ def seal(
     if out_path is None:
         out_path = _derive_output(path, ".seal.json")
 
-    key = load_private_pem(key_path, passphrase) if key_path is not None else None
+    key = load_private_pem(key_path, passphrase) if key_path is not None else generate_key()
 
     sha256_hex, size = file_digest(path)
     source_format = detect_format(path)
-    messages = list(iter_messages(path))
+    # Messages are hashed as they are read, so memory does not grow with the log's size.
+    manifest = build_manifest(
+        path, iter_messages(path), sha256_hex, size, key, source_format=source_format
+    )
 
-    if key is None:
-        key = generate_key()
+    if new_key_path is not None:
+        # Written only now, so a log that cannot be read leaves no key behind.
         save_private_pem(key, new_key_path, passphrase)
         console.print(
             f"[bold yellow]Created a new signer key[/bold yellow] -> [cyan]{new_key_path}[/cyan]\n"
@@ -74,8 +77,6 @@ def seal(
             "so others can pin your seals with `veriseal verify --pubkey`:\n"
             + public_pem(key).strip()
         )
-
-    manifest = build_manifest(path, messages, sha256_hex, size, key, source_format=source_format)
 
     if do_anchor:
         # anchor_digest = SHA-256(canonical_json(manifest WITHOUT "anchor"))
