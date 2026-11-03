@@ -1,4 +1,4 @@
-# veriseal Seal Check — version history
+# veriseal Seal Check: version history
 
 ## Unreleased
 

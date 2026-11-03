@@ -93,8 +93,8 @@ def _anchor_report_lines(result: VerificationResult) -> list[str]:
         return [
             "Timestamp anchor: NONE",
             "  This manifest was sealed with --no-anchor, or anchoring failed at seal time.",
-            "  The sealed time (created_utc) rests only on the sealer's assertion — it is",
-            "  not independently corroborated.",
+            "  The sealed time (created_utc) rests only on the sealer's word; nothing",
+            "  independent corroborates it.",
         ]
     lines = ["Timestamp anchor: OpenTimestamps (Bitcoin)"]
     if a.error is not None:
@@ -157,7 +157,7 @@ def _build_report(result: VerificationResult, generated_at: datetime) -> str:
     m = result.manifest
     lines: list[str] = []
     lines.append("=" * 72)
-    lines.append("VERISEAL INCIDENT EVIDENCE — VERIFICATION REPORT")
+    lines.append("VERISEAL INCIDENT EVIDENCE: VERIFICATION REPORT")
     lines.append("=" * 72)
     lines.append("")
     lines.append(f"Report generated: {_iso(generated_at)}  (not part of the sealed evidence)")
@@ -166,9 +166,9 @@ def _build_report(result: VerificationResult, generated_at: datetime) -> str:
     lines.append("VERDICT")
     lines.append("-" * 72)
     if result.ok:
-        lines.append("INTACT — signature valid, Merkle root matches, source file unchanged.")
+        lines.append("INTACT: signature valid, Merkle root matches, source file unchanged.")
     else:
-        lines.append("TAMPERED / INCOMPLETE — see failing checks below.")
+        lines.append("TAMPERED / INCOMPLETE: see the failing checks below.")
     lines.append("")
     lines.append("-" * 72)
     lines.append("CHECKS")
@@ -233,12 +233,12 @@ def _build_report(result: VerificationResult, generated_at: datetime) -> str:
     lines.append("-" * 72)
     lines.append("You do not need to trust this report, the sealing party, or veriseal.")
     lines.append("")
-    lines.append("Option A — offline, in a browser, no install:")
+    lines.append("Option A: offline, in a browser, with nothing to install.")
     lines.append("  Open verify.html (included in this bundle) and drop in the .mcap")
     lines.append("  log and manifest.seal.json. It recomputes the signature, Merkle root,")
-    lines.append("  and file digest entirely client-side — no network calls.")
+    lines.append("  and file digest in the browser, without any network call.")
     lines.append("")
-    lines.append("Option B — veriseal CLI:")
+    lines.append("Option B: the veriseal CLI.")
     lines.append("  pip install git+https://github.com/kylemaps/veriseal")
     lines.append("  veriseal verify <log.mcap> manifest.seal.json --pubkey <signer's pinned key>")
     lines.append("")
@@ -247,55 +247,55 @@ def _build_report(result: VerificationResult, generated_at: datetime) -> str:
 
 
 _COVER_SHEET = """\
-VERISEAL INCIDENT EVIDENCE BUNDLE — COVER SHEET
-================================================
+VERISEAL INCIDENT EVIDENCE BUNDLE: COVER SHEET
+===============================================
 
 WHAT THIS BUNDLE IS
 --------------------
 A tamper-evident evidence package for one sealed robot/autonomy log. It contains
 the signed manifest, a human-readable verification report, the timestamp proof
-(if any), and a fully offline, independent verifier — so a recipient who trusts
-neither the operator nor veriseal can check the evidence themselves.
+(if any), and an independent verifier that works offline, so a recipient who
+trusts neither the operator nor veriseal can check the evidence themselves.
 
 WHAT THE SEAL PROVES
 ---------------------
-  1. INTEGRITY SINCE SEALING — the log file has not changed, byte-for-byte,
+  1. INTEGRITY SINCE SEALING: the log file has not changed, byte-for-byte,
      since it was sealed (SHA-256 file digest + RFC 6962 Merkle tree over every
      message).
-  2. AUTHENTICITY TO A KEY — the manifest was produced by whoever holds the
+  2. AUTHENTICITY TO A KEY: the manifest was produced by whoever holds the
      Ed25519 private key named in this bundle (digital signature).
-  3. (If an anchor is present) A TIMESTAMP CLAIM — an OpenTimestamps proof that a
+  3. (If an anchor is present) A TIMESTAMP CLAIM: an OpenTimestamps proof that a
      Bitcoin block commits to the sealed content. Once checked against that block,
      it shows the content existed no later than the block; report.txt says whether
      veriseal checked it.
 
 WHAT THE SEAL DOES NOT PROVE
 ------------------------------
-  - That the log's CONTENTS are a truthful record of what happened. A recorder
+  - That the log's contents are a truthful record of what happened. A recorder
     that is compromised, misconfigured, or dishonest at capture time can sign
-    false data; the seal only proves the data has not changed SINCE it was
-    signed, not that it was true when signed. Integrity is not veracity.
+    false data; the seal only proves the data has not changed since it was
+    signed. Integrity is not veracity.
   - That the named key belongs to any specific organization or person. Key
-    identity requires an out-of-band check — see the verification report.
-  - Anything about a log sealed without a --pubkey pin having been checked
-    against a key the recipient independently trusts. Pin the key you were
-    given out-of-band, not merely the key embedded in the manifest.
+    identity requires an out-of-band check; see the verification report.
+  - That the key in the manifest is one the recipient trusts. The embedded key
+    says nothing about who signed: pin the key you were given out-of-band
+    (veriseal verify --pubkey).
 
 HOW THIS RELATES TO EU REGULATION
 -----------------------------------
-This bundle is evidence infrastructure, not a compliance certificate. It DOES
-NOT itself satisfy, or certify compliance with, any regulation. What it does:
-provides tamper-evident, independently re-verifiable logs that a manufacturer
-can use IN SUPPORT OF disclosure and incident-reporting obligations, including:
+This bundle is evidence infrastructure, not a compliance certificate. It does
+not itself satisfy, or certify compliance with, any regulation. It provides
+tamper-evident, independently re-verifiable logs that a manufacturer can use in
+support of disclosure and incident-reporting obligations, including:
 
-  - EU Product Liability Directive (2024/2853) — Article 9's disclosure duty:
+  - EU Product Liability Directive (2024/2853), Article 9's disclosure duty:
     a court may order a manufacturer to disclose relevant evidence, and a
     manufacturer's own, unverifiable logs are inherently self-serving. A
     tamper-evident, independently verifiable log is stronger evidence of
     what a system did.
-  - EU AI Act (Regulation 2024/1689), Article 73 — serious-incident reporting
+  - EU AI Act (Regulation 2024/1689), Article 73: serious-incident reporting
     to market-surveillance authorities.
-  - EU Machinery Regulation (2023/1230) — tamper-evidence expectations for
+  - EU Machinery Regulation (2023/1230): tamper-evidence expectations for
     autonomous mobile machinery logging.
 
 Whether this bundle is sufficient for any specific legal, regulatory, or
@@ -307,7 +307,7 @@ WHAT'S IN THIS BUNDLE
   manifest.seal.json   The signed manifest, verbatim, as produced by `veriseal seal`.
   report.txt           Human-readable verification report (this bundle's findings).
   anchor.ots           OpenTimestamps proof, if the manifest was anchored (binary).
-  verify.html           Standalone, offline, client-side re-verifier (open in a browser).
+  verify.html          Standalone, offline, client-side re-verifier (open in a browser).
   README.txt           Index of this bundle and re-verification instructions.
 
 PROJECT
@@ -327,12 +327,12 @@ This directory is a portable evidence package for:
 Start here:
   1. Read cover-sheet.txt for what this bundle proves (and does not prove).
   2. Read report.txt for this bundle's specific verification findings.
-  3. To re-verify independently, open verify.html in a browser (works fully
-     offline — no install, no network call) and load {mcap_name} plus
+  3. To re-verify independently, open verify.html in a browser (it works
+     offline, with nothing to install) and load {mcap_name} plus
      manifest.seal.json.
 
 Files:
-  cover-sheet.txt      What a seal proves / doesn't prove, and the regulatory framing.
+  cover-sheet.txt      What a seal proves and does not prove, and how it relates to regulation.
   report.txt           Verification findings for this specific log.
   manifest.seal.json   The signed manifest (verbatim).
 {anchor_line}  verify.html          Offline, independent, client-side verifier.

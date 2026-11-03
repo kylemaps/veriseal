@@ -1,6 +1,6 @@
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-MSPiJnXS2Agf5bPo6AjBjH9CsEBBSGmmWQB+XIJQd9Q=' 'sha256-UT8MP8DpnDzIpSJGbkReUEl3lE34hAY2uKz46vxC2mU='; style-src 'sha256-rn3j9olfqLDwcBVId9ys3s6+9cH6+HAcBdiuFp9yVxs='; base-uri 'none'; form-action 'none'">
-<title>veriseal — independent verifier</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-UT8MP8DpnDzIpSJGbkReUEl3lE34hAY2uKz46vxC2mU=' 'sha256-chSe5igGOgQHoPIDXhSCaQgezum34ZeaA2Xyf7Oj3ks='; style-src 'sha256-rn3j9olfqLDwcBVId9ys3s6+9cH6+HAcBdiuFp9yVxs='; base-uri 'none'; form-action 'none'">
+<title>veriseal: independent verifier</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   :root {
@@ -234,15 +234,15 @@
   <p class="lede">
     Drop a sealed log (<strong>.mcap</strong>) and its <strong>.seal.json</strong> manifest.
     This page recomputes the signature, the Merkle root, and the file digest
-    <strong>entirely in your browser</strong> &mdash; nothing is uploaded.
+    <strong>in your browser</strong>; nothing is uploaded.
   </p>
 
   <div class="neutrality">
     <span class="k">Why this matters</span>
     <span>You are checking the evidence yourself, without trusting the operator who produced
     the log or the tool that sealed it. A green <strong>VERIFIED</strong> requires you to pin the
-    signer's key (below): only then does it mean the log matches a seal made by <strong>that
-    specific signer</strong> &mdash; proved on your own machine. Without a pinned key the result
+    signer's key (below); only then does it mean the log matches a seal made by <strong>that
+    signer</strong>, checked on your own machine. Without a pinned key the result
     stays amber, because anyone could re-seal a tampered log with their own key.</span>
   </div>
 
@@ -262,7 +262,7 @@
   <div class="keypin">
     <label class="kp-label" for="pubkey">Expected signer key &middot; PEM &middot; optional</label>
     <textarea id="pubkey" spellcheck="false" placeholder="-----BEGIN PUBLIC KEY-----&#10;…&#10;-----END PUBLIC KEY-----"></textarea>
-    <div class="kp-note">Paste the signer's public key, obtained <b>out-of-band</b> (not from this file), to pin authenticity. Without it, a tampered log re-signed with a new key would still look valid &mdash; so a genuine-looking seal stays <b>amber</b>, never green, until you pin the key.</div>
+    <div class="kp-note">Paste the signer's public key, obtained <b>out-of-band</b> (not from this file), to pin authenticity. Without it, a tampered log re-signed with a new key would still look valid, so a genuine-looking seal stays <b>amber</b> until you pin the key.</div>
   </div>
 
   <section class="verdict state-idle" id="verdict" aria-live="polite">
@@ -284,8 +284,8 @@
 
   <footer>
     <div>Verification runs client-side with the WebCrypto API (Ed25519 + SHA-256). Open the source: this file has no network calls.</div>
-    <div><b>Signature</b> &mdash; the manifest is authentic to its Ed25519 key. <b>Merkle root</b> &mdash; the listed message hashes fold to the signed root. <b>File digest</b> &mdash; the log's bytes match what was sealed; any change flips this.</div>
-    <div><b>Signer key pin</b> &mdash; paste the signer's public key (obtained out-of-band) into the field above. A green VERIFIED requires it; without it the result stays amber, because the embedded key alone proves nothing about who signed.</div>
+    <div><b>Signature</b>: the manifest is authentic to its Ed25519 key. <b>Merkle root</b>: the listed message hashes fold to the signed root. <b>File digest</b>: the log's bytes match what was sealed; any change flips this.</div>
+    <div><b>Signer key pin</b>: paste the signer's public key (obtained out-of-band) into the field above. A green VERIFIED requires it; without it the result stays amber, because the embedded key alone proves nothing about who signed.</div>
   </footer>
 </div>
 
@@ -615,7 +615,7 @@ function render(view) {
   } else if (view.status === "warn") {
     badge.textContent = "!";
     title.textContent = "AUTHENTICITY NOT ESTABLISHED";
-    sub.textContent = "Signature, Merkle root, and file bytes all check out — but no signer key is pinned. A tampered log re-signed with a different key would look identical. Paste the signer's key above to establish authenticity.";
+    sub.textContent = "Signature, Merkle root and file bytes all check out, but no signer key is pinned. A tampered log re-signed with a different key would look identical. Paste the signer's key above to establish authenticity.";
   } else if (r.pinned && !r.keyMatch && r.sigOk && r.rootOk && r.fileOk) {
     badge.textContent = "✗";
     title.textContent = "SIGNER MISMATCH";
@@ -629,7 +629,7 @@ function render(view) {
   // check rows
   checks.appendChild(checkRow(
     r.sigOk, "Manifest signature",
-    r.sigOk ? "The seal is authentic to its Ed25519 key." : "Signature INVALID — the manifest itself was altered.",
+    r.sigOk ? "The seal is authentic to its Ed25519 key." : "Signature INVALID: the manifest itself was altered.",
     [["key", r.fingerprint.slice(0,32) + "…", null],
      ["alg", "Ed25519", null]]
   ));
@@ -643,7 +643,7 @@ function render(view) {
 
   checks.appendChild(checkRow(
     r.fileOk, "File digest",
-    r.fileOk ? "The log's bytes are exactly what was sealed." : "The log's bytes differ from what was sealed — the file changed.",
+    r.fileOk ? "The log's bytes are exactly what was sealed." : "The log's bytes differ from what was sealed: the file changed.",
     [["sealed", short(r.manifest.source.sha256), null],
      ["actual", short(r.actualDigest), r.fileOk ? "good" : "bad"],
      ["size", r.actualSize + " B" + (r.actualSize === r.manifest.source.size_bytes ? "" : " (sealed " + r.manifest.source.size_bytes + " B)"),
@@ -655,8 +655,8 @@ function render(view) {
     checks.appendChild(checkRow(
       r.keyMatch, "Signer key pin",
       r.keyMatch
-        ? "The manifest's key matches the key you pinned — authentic to that signer."
-        : (r.pinError || "The manifest's key does NOT match the key you pinned — wrong signer, or re-signed after tampering."),
+        ? "The manifest's key matches the key you pinned, so the seal is authentic to that signer."
+        : (r.pinError || "The manifest's key does NOT match the key you pinned: a different signer, or a log re-signed after tampering."),
       [["manifest", short(r.fingerprint), null],
        ["pinned", r.pinError ? "unreadable" : short(rawKeyHexSafe(state.pubkey)), r.keyMatch ? "good" : "bad"]]
     ));
@@ -676,15 +676,15 @@ function render(view) {
       [["type", "opentimestamps", null]]));
   } else {
     checks.appendChild(checkRow("skip", "Timestamp anchor",
-      "No anchor in this manifest — time rests on the sealer's assertion.", []));
+      "No anchor in this manifest, so the time rests on the sealer's word.", []));
   }
 
   if (view.status === "warn") {
-    checks.appendChild(noteRow("warn", "!", "Integrity checks pass, but authenticity is not established. Pin the signer's key (paste it above) to reach a green VERIFIED. Until then, treat the signer as unproven — anyone could have produced this seal."));
+    checks.appendChild(noteRow("warn", "!", "Integrity checks pass, but authenticity is not established. Pin the signer's key (paste it above) to reach a green VERIFIED. Until then, treat the signer as unproven: anyone could have produced this seal."));
   } else if (!r.intact) {
     const why = (r.pinned && !r.keyMatch && r.sigOk && r.rootOk && r.fileOk)
-      ? "The log is internally consistent but was signed by a different key than the one you pinned — a wrong signer, or a tampered log re-signed after the fact."
-      : "Because a check failed, do not treat this log as evidence — it was modified after sealing, or the wrong file/manifest pair was loaded.";
+      ? "The log is internally consistent but was signed by a different key than the one you pinned: a different signer, or a tampered log re-signed after the fact."
+      : "Because a check failed, do not treat this log as evidence: it was modified after sealing, or the wrong file and manifest were loaded together.";
     checks.appendChild(noteRow("fail", "✗", why));
   }
 }

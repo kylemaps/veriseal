@@ -1,10 +1,8 @@
-# veriseal Manifest Specification — v1
+# veriseal manifest specification, v1
 
 > Schema version identifier: `"veriseal-manifest-v1"`
 
-This document specifies the `.seal.json` manifest format produced by `veriseal seal` and consumed by `veriseal verify`. A conforming verifier needs only this document, the source MCAP, and standard SHA-256 / Ed25519 libraries — it does not need the `veriseal` codebase.
-
----
+This document specifies the `.seal.json` manifest format produced by `veriseal seal` and consumed by `veriseal verify`. A conforming verifier needs only this document, the source MCAP, and standard SHA-256 and Ed25519 libraries; it does not need the `veriseal` codebase.
 
 ## 1. Canonical JSON encoding
 
@@ -26,13 +24,11 @@ json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow
 
 > **Note:** This is NOT RFC 8785 (JCS). JCS requires Unicode escape sequences for certain code points and has additional constraints not present here.
 
-> **No floating-point numbers.** The signed payload MUST contain only integers, never floats. Python and JavaScript serialize floats differently (e.g. `1.0` vs `1`, and they disagree on precision/exponent formatting), which would make the canonical bytes — and thus the signature — diverge between a Python and a browser verifier. veriseal's schema is all-integer (nanosecond times, byte sizes, counts); `veriseal seal` rejects any float in the payload rather than emit non-portable canonical bytes.
+> **No floating-point numbers.** The signed payload MUST contain only integers, never floats. Python and JavaScript serialize floats differently (e.g. `1.0` vs `1`, and they disagree on precision/exponent formatting), which would make the canonical bytes, and so the signature, diverge between a Python and a browser verifier. veriseal's schema is all-integer (nanosecond times, byte sizes, counts); `veriseal seal` rejects any float in the payload rather than emit non-portable canonical bytes.
 
 > **Parsing.** A verifier MUST reject every manifest the reference rejects, even when it could read a sensible value from it. In particular it MUST reject any number written with a fraction or exponent (`1.0`, `1.7e18`), even when its value is a whole number, because the reference reads it as a float and refuses it; it MUST keep integers above 2^53 exact; and it MUST reject strings that are not well-formed Unicode (a lone surrogate such as `"\ud800"`), which cannot be encoded as UTF-8. [`conformance/parse-cases.json`](conformance/parse-cases.json) lists inputs and the canonical bytes (or rejection) each must produce.
 
 > **String ordering.** Object keys and leaf sort keys are ordered by Unicode **code point** (Python's default string comparison). A conforming verifier that compares strings by UTF-16 code unit (JavaScript's default `<`) agrees for the Basic Multilingual Plane, but can disagree for astral-plane characters (above U+FFFF). Topic strings are expected to be ASCII; do not rely on a particular ordering of astral-plane topic names.
-
----
 
 ## 2. Leaf preimage and leaf hash
 
@@ -57,8 +53,6 @@ The **leaf hash** is (RFC 6962 domain separator `0x00` for leaf nodes):
 leaf_hash = SHA-256( b"\x00" + preimage )
 ```
 
----
-
 ## 3. Merkle tree (RFC 6962 §2.1)
 
 Leaves are sorted ascending by `(log_time_ns, topic_utf8, leaf_hash_hex)` before tree construction. This ordering is normative and recorded in `merkle.ordering`.
@@ -81,8 +75,6 @@ k = 1 << ((n - 1).bit_length() - 1)
 
 > **Note:** Input leaves are **already hashed** (the `0x00`-prefixed leaf hashes from §2). `MTH([h])` returns `h` directly without double-hashing.
 
----
-
 ## 4. Signed payload
 
 The Ed25519 signature covers **canonical JSON of the manifest with `"signature"` and `"anchor"` keys removed**:
@@ -94,8 +86,6 @@ signed_payload = canonical_json(
 ```
 
 This commits to: `schema_version`, `tool_version`, `created_utc`, `source`, `messages`, `hash_alg`, `merkle` (scheme, root, ordering), and all `leaves`.
-
----
 
 ## 5. Full manifest schema
 
@@ -154,8 +144,6 @@ This commits to: `schema_version`, `tool_version`, `created_utc`, `source`, `mes
 }
 ```
 
----
-
 ## 6. Anchor block (OpenTimestamps)
 
 When `--anchor` is used (the default), `"anchor"` is replaced with:
@@ -199,8 +187,6 @@ Without the check, the CLI reports a Bitcoin attestation as "calendar-attested, 
 
 **Informational in verify.** `veriseal verify` reports anchor status separately after the INTACT/TAMPERED verdict; anchor state does not change the exit code unless `--require-anchor` is set.
 
----
-
 ## 7. Independent verification algorithm
 
 A verifier without the `veriseal` library can verify a sealed manifest as follows:
@@ -217,23 +203,21 @@ A verifier without the `veriseal` library can verify a sealed manifest as follow
 
 ### 7.1 Overall verdict (normative)
 
-A seal proves the source file is byte-for-byte unchanged since sealing. The single **INTACT** verdict therefore requires **all** of:
+A seal proves the source file is byte-for-byte unchanged since sealing. The single INTACT verdict therefore requires all of:
 
-- the **source check** (step 2) passes — the file's bytes match `source.sha256`/`size_bytes`;
-- the **Merkle check** (step 6) passes;
-- the **signature check** (step 7) passes;
+- the source check (step 2) passes: the file's bytes match `source.sha256`/`size_bytes`;
+- the Merkle check (step 6) passes;
+- the signature check (step 7) passes;
 - and, when the verifier was given an expected signer key out-of-band, that key matches the manifest's key (see §8).
 
-If any of these fails, the verdict is **TAMPERED**. This is the same verdict on every surface: the `veriseal verify` exit code (`0` = INTACT with the signer pinned, `3` = INTACT with no key pinned, see §8), the incident-pack report, the standalone web verifier, and (for the checks it can compute) the Foxglove panel. The panel is the one exception in *scope*, not in semantics: it never sees the raw file bytes, so it verifies only signature + Merkle root and explicitly labels its pass state "raw file not checked in-panel," directing the reader to `veriseal verify` or the web verifier for byte integrity.
+If any of these fails, the verdict is TAMPERED. This is the same verdict on every surface: the `veriseal verify` exit code (`0` = INTACT with the signer pinned, `3` = INTACT with no key pinned, see §8), the incident-pack report, the standalone web verifier, and (for the checks it can compute) the Foxglove panel. The panel differs only in scope: it never sees the raw file bytes, so it verifies only signature + Merkle root and explicitly labels its pass state "raw file not checked in-panel," directing the reader to `veriseal verify` or the web verifier for byte integrity.
 
-> **Note:** steps 2–7 are independent *checks*, and `veriseal verify` reports each one's PASS/FAIL separately so a re-muxed MCAP with byte-identical message payloads is visibly distinguishable (it fails step 2 but passes steps 5–7). They are independent in *diagnosis* but not in *verdict*: any failing check makes the overall verdict TAMPERED.
-
----
+> **Note:** steps 2 to 7 are independent *checks*, and `veriseal verify` reports each one's PASS/FAIL separately so a re-muxed MCAP with byte-identical message payloads is visibly distinguishable (it fails step 2 but passes steps 5 to 7). They are independent in *diagnosis* but not in *verdict*: any failing check makes the overall verdict TAMPERED.
 
 ## 8. Signer-key pinning (trust anchoring)
 
-The signature check (step 7) proves only that the manifest was signed by *whoever holds the private key named in the manifest itself* — an attacker who tampers with a log can re-hash it and re-sign with **their own** freshly generated key, and step 7 alone will still pass. Authenticity therefore requires **pinning** the signer's key: comparing the manifest's `signature.public_key` against a key the verifier obtained **out-of-band** (a fingerprint the sealing party published or handed over separately), not merely trusting the embedded key.
+The signature check (step 7) proves only that the manifest was signed by *whoever holds the private key named in the manifest itself*. An attacker who tampers with a log can re-hash it and re-sign it with their own freshly generated key, and step 7 alone will still pass. Authenticity therefore requires pinning the signer's key: comparing the manifest's `signature.public_key` against a key the verifier obtained out-of-band (a fingerprint the sealing party published or handed over separately), not merely trusting the embedded key.
 
 - `veriseal verify --pubkey <key.pem>` pins the key: the raw 32-byte Ed25519 public key from the manifest must equal the raw key of the supplied PEM, or the verdict is TAMPERED.
-- When **no** key is pinned, no authenticity to a real-world identity is established. Verifiers MUST NOT present an unpinned pass as fully verified: the CLI reports "INTACT (signer not pinned)" and exits `3`, not `0`, unless the caller passes `--allow-unpinned`; the browser verifiers render a distinct amber/neutral state ("authenticity not independently established — pin the signer's key"), never a green VERIFIED.
+- When no key is pinned, no authenticity to a real-world identity is established. Verifiers MUST NOT present an unpinned pass as fully verified: the CLI reports "INTACT (signer not pinned)" and exits `3`, not `0`, unless the caller passes `--allow-unpinned`; the browser verifiers render a distinct amber/neutral state ("authenticity not established"; pin the signer's key to go green), never a green VERIFIED.
 - The comparison is over the raw key bytes (SPKI/PEM encoding differences do not matter), matching `veriseal verify --pubkey`.

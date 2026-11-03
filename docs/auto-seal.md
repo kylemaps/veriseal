@@ -1,7 +1,7 @@
 # Auto-sealing every recording
 
 Add one step to your recording workflow and every log is sealed the moment it finishes.
-The pattern is always the same: **record, then `veriseal seal` with a persistent signer key.**
+The pattern is always the same: record, then run `veriseal seal` with a persistent signer key.
 
 ## 1. Make a signer key once
 
@@ -75,25 +75,24 @@ When recording stops, the seal runs against the finished file(s).
 ## 4. Pinning the signer
 
 The seal proves a log matches a seal made by your key. For that to mean anything to a third
-party, they must know the key is yours — so give them `signer.pub.pem` **out-of-band** (not
-just inside the manifest) and have them pin it:
+party, they must know the key is yours, so give them `signer.pub.pem` out-of-band (separately from
+the manifest) and have them pin it:
 
 ```bash
 veriseal verify drive/drive_0.mcap drive/drive_0.mcap.seal.json --pubkey signer.pub.pem
 ```
 
-Without `--pubkey`, a re-seal with a different key would still pass; pinning is what makes the
-seal independently meaningful.
+Without `--pubkey`, a re-seal with a different key would also pass, which is why `verify` then
+exits 3 instead of 0.
 
 ## Notes
 
-- **Seal after recording completes.** These snippets seal the finished file, so the sealed
-  bytes are the final recording, not a partial one.
-- **Anchoring.** `veriseal seal` submits the Merkle root to OpenTimestamps by default (needs
-  network). Add `--no-anchor` for offline/air-gapped rigs; run
-  [`veriseal anchor upgrade`](../README.md#opentimestamps-anchor) later to pull in the Bitcoin
-  confirmation once it lands.
-- **ROS 1.** The same one-liner works on a `.bag` if you install `veriseal[ros1]` and seal the
-  `.bag` directly — see [docs/ros1.md](ros1.md).
-- **What it proves / doesn't.** Integrity-since-sealing and authenticity-to-your-key — not that
-  the log's contents are true. See the [threat model](../README.md#threat-model).
+- These snippets seal the finished file, so the sealed bytes are the final recording.
+- `veriseal seal` submits the Merkle root to OpenTimestamps by default, which needs network
+  access; add `--no-anchor` on offline or air-gapped rigs. An anchored seal starts out pending:
+  run [`veriseal anchor upgrade`](../README.md#opentimestamps-anchor) a few hours later to fetch
+  its Bitcoin attestation.
+- The same one-liner works on a ROS 1 `.bag` once `veriseal[ros1]` is installed; see
+  [docs/ros1.md](ros1.md).
+- A seal proves the log is unchanged since sealing and was signed by your key. It does not prove
+  the log's contents are true; see the [threat model](../README.md#threat-model).

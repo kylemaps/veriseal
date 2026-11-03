@@ -1,34 +1,32 @@
-# veriseal Seal Check — Foxglove panel
+# veriseal Seal Check: a Foxglove panel
 
 A Foxglove Studio panel that checks a [veriseal](https://github.com/kylemaps/veriseal) seal
-**without leaving your visualization**. Open a log, load its `.seal.json`, and a live badge tells
-you whether the seal is authentic to its signer:
+without leaving Foxglove. Open a log, load its `.seal.json`, and a live badge tells you whether
+the seal is authentic to its signer:
 
-> **SIGNER VERIFIED** — signature valid & pinned to your key · internally consistent · raw file not checked in-panel
->
-> **AUTHENTICITY NOT ESTABLISHED** — signature valid, but no signer key pinned
->
-> **MANIFEST INVALID** — the manifest is not internally consistent, or the signer key doesn't match the one you pinned
->
-> **CANNOT CHECK** — the seal file couldn't be parsed or checked (the reason is shown)
+- **SIGNER VERIFIED**: the signature is valid and was made by the key you pinned, and the
+  manifest is internally consistent. The raw file is not checked in the panel.
+- **AUTHENTICITY NOT ESTABLISHED**: the signature is valid, but no signer key is pinned.
+- **MANIFEST INVALID**: the manifest is not internally consistent, or it was not signed by the
+  key you pinned.
+- **CANNOT CHECK**: the seal file couldn't be parsed or checked. The panel shows the reason.
 
-## What it checks (and what it doesn't)
+## What it checks
 
-A Foxglove panel only ever receives **deserialized** messages — never the raw serialized bytes
-that veriseal hashes into Merkle leaves. So this panel is deliberate about its claims. It verifies:
+A Foxglove panel only receives deserialized messages, never the raw serialized bytes that
+veriseal hashes into Merkle leaves, so the panel checks what it can compute from the seal file:
 
-1. **Manifest signature** — the seal is authentic to its Ed25519 key (WebCrypto).
-2. **Signer pin** — paste the signer's public key (obtained out-of-band) into the panel's key
+1. Manifest signature: the seal is authentic to its Ed25519 key (WebCrypto).
+2. Signer pin: paste the signer's public key (obtained out-of-band) into the panel's key
    field. The badge is green only when the seal was signed by that key; without a pinned key it
-   stays amber, because the key embedded in the seal proves nothing about who signed.
-3. **Merkle root** — the listed message hashes fold to the signed root (RFC 6962).
-4. **Sealed window** — message count, time range, and anchor status recorded in the seal.
-5. **Coverage** — flags topics loaded in this view that the seal does not cover.
+   stays amber, because the key embedded in the seal says nothing about who signed.
+3. Merkle root: the listed message hashes fold to the signed root (RFC 6962).
+4. Sealed window: the message count, time range and anchor status recorded in the seal.
+5. Coverage: topics loaded in this view that the seal does not cover are flagged.
 
-It does **not** recompute the whole-file SHA-256 of the `.mcap`, because a panel can't see the
-file bytes. That check — the one that catches an edited log byte-for-byte — belongs to
-`veriseal verify` on the CLI or the standalone [web verifier](../web/verify.html), which have the
-raw file. The panel is honest about this boundary rather than faking a proof it can't compute.
+It does not recompute the whole-file SHA-256 of the `.mcap`, because a panel can't see the file
+bytes. That check, which catches any byte-level edit, is done by `veriseal verify` on the CLI or
+by the standalone [web verifier](../web/verify.html), which have the raw file.
 
 The verification core ([`src/sealcore.ts`](src/sealcore.ts)) mirrors the Python reference in
 `../src/veriseal/` byte-for-byte (canonical JSON, RFC 6962 Merkle, Ed25519). `npm test` compiles

@@ -236,13 +236,13 @@ function SealCheckPanel({ context }: { context: PanelExtensionContext }): ReactE
           </div>
           <div style={{ fontSize: 12.5, color: palette.ink2, marginTop: 2 }}>
             {verdict === "verified" && result
-              ? `Signature valid & pinned to your key · internally consistent · raw file not checked in-panel`
+              ? "Signature valid and pinned to your key; manifest internally consistent; raw file not checked in-panel"
               : verdict === "unpinned"
-                ? "Signature valid, but no signer key pinned — a tampered re-seal with a new key would look identical. Pin the signer's key below."
+                ? "Signature valid, but no signer key pinned. A tampered log re-sealed with a new key would look the same, so pin the signer's key below."
                 : verdict === "tampered"
                   ? (result?.pubkeyPinned === true && !result.pubkeyOk
                       ? "Signer key does NOT match the key you pinned."
-                      : "The manifest is not internally consistent — see below.")
+                      : "The manifest is not internally consistent; see below.")
                   : verdict === "error"
                     ? (parseError ?? result?.error)
                     : "Load the log's .seal.json to check it in-workflow."}
@@ -280,7 +280,7 @@ function SealCheckPanel({ context }: { context: PanelExtensionContext }): ReactE
       {/* expected signer key (pinning) */}
       <div style={{ marginTop: 10 }}>
         <div style={{ fontSize: 11.5, color: palette.ink3, marginBottom: 4 }}>
-          Expected signer public key (PEM) — paste the key you were given out-of-band
+          Expected signer public key (PEM). Paste the key you were given out-of-band
           to pin authenticity. Optional, but without it authenticity is not established.
         </div>
         <textarea
@@ -313,7 +313,7 @@ function SealCheckPanel({ context }: { context: PanelExtensionContext }): ReactE
             desc={
               result.signatureOk
                 ? "Authentic to its Ed25519 key."
-                : "Signature INVALID — the manifest was altered."
+                : "Signature INVALID: the manifest was altered."
             }
             kvs={[
               ["key", short(result.keyFingerprint)],
@@ -340,7 +340,7 @@ function SealCheckPanel({ context }: { context: PanelExtensionContext }): ReactE
               desc={
                 result.pubkeyOk
                   ? "Manifest key matches the key you pinned."
-                  : "Manifest key does NOT match the key you pinned — wrong signer or re-signed."
+                  : "Manifest key does NOT match the key you pinned: a different signer, or a re-signed log."
               }
               kvs={[["manifest", short(result.keyFingerprint)]]}
             />
@@ -385,8 +385,8 @@ function SealCheckPanel({ context }: { context: PanelExtensionContext }): ReactE
         }}
       >
         This panel verifies the seal&rsquo;s <b style={{ color: palette.ink2 }}>signature</b> and{" "}
-        <b style={{ color: palette.ink2 }}>Merkle root</b> — that the manifest is authentic to its
-        signer. Whole-file byte integrity (the SHA-256 of the .mcap) needs the raw file, which a
+        <b style={{ color: palette.ink2 }}>Merkle root</b>, which show that the manifest is authentic
+        to its signer and internally consistent. Whole-file byte integrity (the SHA-256 of the .mcap) needs the raw file, which a
         panel never sees; run <code style={{ fontFamily: palette.mono }}>veriseal verify</code> or
         the standalone web verifier for that.
       </div>

@@ -132,9 +132,7 @@ def keygen(
     )
     if pub is not None:
         console.print(f"[green]Wrote public key[/green]  -> [cyan]{pub}[/cyan]")
-    console.print(
-        "\n[bold]Public key[/bold] — share this out-of-band so others can pin your seals:"
-    )
+    console.print("\n[bold]Public key[/bold]: share this out-of-band so others can pin your seals.")
     console.print(pub_pem.strip())
 
 
@@ -236,7 +234,7 @@ def pack(
     else:
         console.print(
             f"[bold yellow]Pack written[/bold yellow]: {result.out}  "
-            "([bold red]verification FAILED[/bold red] — see report.txt)"
+            "([bold red]verification FAILED[/bold red]; see report.txt)"
         )
     raise typer.Exit(code=0 if result.ok else 1)
 
