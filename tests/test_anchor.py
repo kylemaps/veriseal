@@ -281,3 +281,49 @@ def test_prior_verify_tampered_with_no_anchor(mcap_path: Path, tmp_path: Path) -
     ]
     tampered_mcap = _write_mcap(tmp_path / "tampered.mcap", tampered_msgs)
     assert verify_seal(tampered_mcap, seal_path) == 1
+
+
+# ── seal summary always states the anchor ────────────────────────────────────
+
+
+def _summary(capsys: pytest.CaptureFixture[str]) -> str:
+    return " ".join(capsys.readouterr().out.replace("│", " ").split())
+
+
+def test_seal_summary_says_pending(
+    mcap_path: Path, tmp_path: Path, patched_submit: None, capsys: pytest.CaptureFixture[str]
+) -> None:
+    seal(mcap_path, new_key_path=tmp_path / "k.pem", out_path=tmp_path / "s.seal.json")
+    assert "Anchor: pending (submitted to OpenTimestamps)" in _summary(capsys)
+
+
+def test_seal_summary_says_unanchored_when_submission_fails(
+    mcap_path: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    import veriseal.anchor as anchor_mod
+
+    def unreachable(digest: bytes) -> bytes:
+        raise RuntimeError("All calendars unreachable")
+
+    monkeypatch.setattr(anchor_mod, "submit", unreachable)
+    seal(mcap_path, new_key_path=tmp_path / "k.pem", out_path=tmp_path / "s.seal.json")
+    out = _summary(capsys)
+    assert "Anchor: UNANCHORED: no timestamp proof" in out
+    assert json.loads((tmp_path / "s.seal.json").read_bytes())["anchor"] is None
+
+
+def test_seal_summary_says_no_anchor_when_skipped(
+    mcap_path: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    seal(
+        mcap_path,
+        new_key_path=tmp_path / "k.pem",
+        out_path=tmp_path / "s.seal.json",
+        do_anchor=False,
+    )
+    out = _summary(capsys)
+    assert "Anchor: none (--no-anchor)" in out
+    assert "UNANCHORED" not in out

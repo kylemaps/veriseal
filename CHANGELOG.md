@@ -16,6 +16,7 @@
 
 ### Changed
 
+- The `seal` summary always states the anchor: pending, none (`--no-anchor`), or UNANCHORED when OpenTimestamps could not be reached (before, that was a single warning line).
 - Private keys from `keygen` and `seal --new-key` are created readable by their owner only (mode 0600), and an existing file is never replaced (`keygen --force` still replaces one on purpose).
 
 ### Security

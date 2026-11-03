@@ -103,15 +103,22 @@ def seal(
 
     out_path.write_bytes(canonical_json(manifest))
 
-    anchor_status = ""
     if manifest.get("anchor"):
-        anchor_status = "\n[bold]Anchor:[/bold]      pending (OTS submitted)"
+        anchor_status = "pending (submitted to OpenTimestamps)"
+    elif do_anchor:
+        anchor_status = (
+            "[bold red]UNANCHORED[/bold red]: no timestamp proof, because OpenTimestamps "
+            "could not be reached. Seal again with network access to add one."
+        )
+    else:
+        anchor_status = "none (--no-anchor)"
 
     console.print(
         Panel(
             f"[bold]Messages:[/bold]    {manifest['messages']['count']}\n"
             f"[bold]Merkle root:[/bold] {manifest['merkle']['root']}\n"
-            f"[bold]Manifest:[/bold]    {out_path}" + anchor_status,
+            f"[bold]Manifest:[/bold]    {out_path}\n"
+            f"[bold]Anchor:[/bold]      {anchor_status}",
             title="[green]Seal complete[/green]",
             expand=False,
         )
