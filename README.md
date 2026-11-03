@@ -109,6 +109,17 @@ veriseal pack log.mcap log.seal.json --out incident-pack --zip   # single .zip t
 veriseal anchor upgrade log.seal.json
 ```
 
+### Signer keys
+
+`veriseal keygen` and `seal --new-key` create the private key readable by its owner only (mode 0600; on Windows the folder's permissions apply), and never overwrite an existing file (`keygen --force` replaces one on purpose). To encrypt the key, put a passphrase in an environment variable and name the variable with `--key-passphrase-env`, for both commands:
+
+```bash
+veriseal keygen --out signer.key.pem --pub signer.pub.pem --key-passphrase-env SIGNER_PASS
+veriseal seal log.mcap --key signer.key.pem --key-passphrase-env SIGNER_PASS
+```
+
+Whoever holds the private key can seal anything in your name. Keep it out of the folders where logs are recorded, packed or shared, so copying evidence never copies the key.
+
 ### Exit codes
 
 `veriseal verify` exits with:

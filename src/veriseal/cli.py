@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import typer
@@ -19,6 +20,22 @@ anchor_app = typer.Typer(
 app.add_typer(anchor_app, name="anchor")
 console = Console()
 
+_PASSPHRASE_HELP = (
+    "Read the signer key's passphrase from environment variable VAR, not the command line "
+    "(where other users could see it)."
+)
+
+
+def _passphrase(env_var: str | None) -> bytes | None:
+    """The passphrase held in environment variable *env_var*, if one was named."""
+    if env_var is None:
+        return None
+    value = os.environ.get(env_var)
+    if not value:
+        console.print(f"[bold red]ERROR:[/bold red] environment variable {env_var} is not set")
+        raise typer.Exit(code=2)
+    return value.encode("utf-8")
+
 
 @app.command()
 def seal(
@@ -35,9 +52,16 @@ def seal(
     anchor: bool = typer.Option(
         True, "--anchor/--no-anchor", help="Submit Merkle root to OpenTimestamps calendars."
     ),
+    key_passphrase_env: str | None = typer.Option(
+        None,
+        "--key-passphrase-env",
+        metavar="VAR",
+        help=_PASSPHRASE_HELP + " Decrypts --key, or encrypts the --new-key it creates.",
+    ),
 ) -> None:
     """Hash every message, build a Merkle tree, sign, and write manifest."""
     from veriseal.seal import seal as do_seal
+    from veriseal.signing import KeyPassphraseError
 
     if (key is None) == (new_key is None):
         console.print(
@@ -52,7 +76,15 @@ def seal(
         )
         raise typer.Exit(code=1)
 
-    do_seal(path, key, out, do_anchor=anchor, new_key_path=new_key)
+    passphrase = _passphrase(key_passphrase_env)
+    try:
+        do_seal(path, key, out, do_anchor=anchor, new_key_path=new_key, passphrase=passphrase)
+    except KeyPassphraseError as exc:
+        console.print(
+            f"[bold red]ERROR:[/bold red] {exc}"
+            + ("" if key_passphrase_env else " (use --key-passphrase-env VAR)")
+        )
+        raise typer.Exit(code=2)
 
 
 @app.command()
@@ -64,6 +96,12 @@ def keygen(
         None, "--pub", help="Also write the public key (PEM) to this path."
     ),
     force: bool = typer.Option(False, "--force", help="Overwrite --out if it already exists."),
+    key_passphrase_env: str | None = typer.Option(
+        None,
+        "--key-passphrase-env",
+        metavar="VAR",
+        help=_PASSPHRASE_HELP + " Encrypts the new key.",
+    ),
 ) -> None:
     """Generate an Ed25519 signer keypair for sealing.
 
@@ -80,13 +118,18 @@ def keygen(
         )
         raise typer.Exit(code=1)
 
+    passphrase = _passphrase(key_passphrase_env)
     key = generate_key()
-    save_private_pem(key, out)
+    save_private_pem(key, out, passphrase, overwrite=force)
     pub_pem = public_pem(key)
     if pub is not None:
         pub.write_text(pub_pem, encoding="utf-8")
 
-    console.print(f"[green]Wrote private key[/green] -> [cyan]{out}[/cyan]  (keep this secret)")
+    protection = "encrypted, owner-only" if passphrase else "owner-only, not encrypted"
+    console.print(
+        f"[green]Wrote private key[/green] -> [cyan]{out}[/cyan]  ({protection}; keep it secret, "
+        "and away from the folders that hold the logs it seals)"
+    )
     if pub is not None:
         console.print(f"[green]Wrote public key[/green]  -> [cyan]{pub}[/cyan]")
     console.print(

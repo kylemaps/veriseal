@@ -13,7 +13,10 @@ mkdir -p ~/.veriseal
 veriseal keygen --out ~/.veriseal/signer.key.pem --pub ~/.veriseal/signer.pub.pem
 ```
 
-Keep `signer.key.pem` secret. Hand `signer.pub.pem` to anyone who needs to verify your logs
+`keygen` creates `signer.key.pem` readable by your user only. Keep it secret, and outside the
+folders you record logs to or share, so copying a log folder never copies the key. To encrypt it,
+add `--key-passphrase-env VAR` to `keygen` and to every `seal` (the passphrase is read from that
+environment variable). Hand `signer.pub.pem` to anyone who needs to verify your logs
 (see [Pinning](#4-pinning-the-signer), below). Losing the key does not compromise past seals,
 but you cannot produce new seals under the same identity without it.
 

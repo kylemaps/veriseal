@@ -46,8 +46,12 @@ def seal(
     out_path: Path | None = None,
     do_anchor: bool = True,
     new_key_path: Path | None = None,
+    passphrase: bytes | None = None,
 ) -> None:
-    """Seal *path* with the key at *key_path*, or a new key written to *new_key_path*."""
+    """Seal *path* with the key at *key_path*, or a new key written to *new_key_path*.
+
+    *passphrase* decrypts the key at *key_path*, or encrypts the new one.
+    """
     if (key_path is None) == (new_key_path is None):
         raise ValueError("seal needs exactly one of key_path (existing key) or new_key_path")
     if new_key_path is not None and new_key_path.exists():
@@ -55,7 +59,7 @@ def seal(
     if out_path is None:
         out_path = _derive_output(path, ".seal.json")
 
-    key = load_private_pem(key_path) if key_path is not None else None
+    key = load_private_pem(key_path, passphrase) if key_path is not None else None
 
     sha256_hex, size = file_digest(path)
     source_format = detect_format(path)
@@ -63,7 +67,7 @@ def seal(
 
     if key is None:
         key = generate_key()
-        save_private_pem(key, new_key_path)
+        save_private_pem(key, new_key_path, passphrase)
         console.print(
             f"[bold yellow]Created a new signer key[/bold yellow] -> [cyan]{new_key_path}[/cyan]\n"
             "Keep it secret, and keep it apart from the logs it seals. Share this public key "

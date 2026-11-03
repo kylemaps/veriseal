@@ -12,6 +12,11 @@
 
 - `verify --check-bitcoin` and `pack --check-bitcoin`: check the anchor's Bitcoin attestation against the block header, fetched from mempool.space and blockstream.info, which must agree. The result is "verified against Bitcoin" (with block hash and time), "FALSE" (the block doesn't contain the proof) or "could not check" (with the reason).
 - `verify --allow-unpinned`.
+- `keygen --key-passphrase-env VAR` and `seal --key-passphrase-env VAR`: encrypt the signer key with a passphrase read from an environment variable, and use it.
+
+### Changed
+
+- Private keys from `keygen` and `seal --new-key` are created readable by their owner only (mode 0600), and an existing file is never replaced (`keygen --force` still replaces one on purpose).
 
 ### Security
 
