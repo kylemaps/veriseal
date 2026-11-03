@@ -7,7 +7,8 @@
  *     root equals the root the Python tool signed (byte-for-byte equivalence);
  *   - a flipped leaf hash fails both Merkle and signature checks;
  *   - an altered signed field fails the signature check;
- *   - a non-manifest input is rejected.
+ *   - a non-manifest input is rejected;
+ *   - the parser accepts and rejects the same texts as Python (conformance/parse-cases.json).
  *
  * Run: node test/sealcore.test.mjs   (needs the dev dependencies installed)
  */
@@ -50,13 +51,13 @@ writeFileSync(
 );
 execSync(`npx tsc -p "${tsconfig}"`, { cwd: root, stdio: "inherit" });
 
-const { checkSeal, parseManifestPreservingBigInts, crossCheckShape, merkleRootFromLeaves } =
+const { checkSeal, parseManifest, canonicalize, crossCheckShape, merkleRootFromLeaves } =
   await import("file://" + join(out, "sealcore.js").replace(/\\/g, "/"));
 
 const sealText = readFileSync(join(here, "fixtures/sample.seal.json"), "utf8");
 
 // 2. Genuine manifest.
-const manifest = parseManifestPreservingBigInts(sealText);
+const manifest = parseManifest(sealText);
 const genuineKey = manifest.signature.public_key;
 
 // Unpinned: signature + Merkle pass, but ok is false — authenticity to a real
@@ -88,7 +89,7 @@ check("  pubkeyOk false", pinnedBad.pubkeyOk === false);
 check("  signature still valid (only the pin fails)", pinnedBad.signatureOk);
 
 // 3. Flipped leaf hash.
-const flipped = parseManifestPreservingBigInts(sealText);
+const flipped = parseManifest(sealText);
 flipped.leaves[3].leaf_hash = "00".repeat(32);
 const flippedRes = await checkSeal(flipped);
 check("flipped leaf hash -> not ok", !flippedRes.ok);
@@ -96,7 +97,7 @@ check("  merkle fails", !flippedRes.merkleOk);
 check("  signature fails (covers leaves)", !flippedRes.signatureOk);
 
 // 4. Altered signed field.
-const altered = parseManifestPreservingBigInts(sealText);
+const altered = parseManifest(sealText);
 altered.messages.count = 999;
 const alteredRes = await checkSeal(altered);
 check("altered messages.count -> signature fails", !alteredRes.signatureOk && !alteredRes.ok);
@@ -123,6 +124,21 @@ check(
   `large leaf count (n=${large.leaves.length}) root matches Python`,
   largeRoot === large.root,
 );
+
+// 8. Parser agreement: the shared cases record what the Python reference accepts
+// (with its canonical bytes) and rejects (null), e.g. 1.7e18 must be rejected.
+const parseCases = JSON.parse(
+  readFileSync(join(root, "..", "conformance", "parse-cases.json"), "utf8"),
+).cases;
+for (const { text, canonical } of parseCases) {
+  let got;
+  try {
+    got = canonicalize(parseManifest(text));
+  } catch {
+    got = null;
+  }
+  check(`parse case ${JSON.stringify(text).slice(0, 50)} agrees with Python`, got === canonical);
+}
 
 rmSync(out, { recursive: true, force: true });
 

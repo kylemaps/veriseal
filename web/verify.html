@@ -1,3 +1,5 @@
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-MSPiJnXS2Agf5bPo6AjBjH9CsEBBSGmmWQB+XIJQd9Q=' 'sha256-UT8MP8DpnDzIpSJGbkReUEl3lE34hAY2uKz46vxC2mU='; style-src 'sha256-rn3j9olfqLDwcBVId9ys3s6+9cH6+HAcBdiuFp9yVxs='; base-uri 'none'; form-action 'none'">
 <title>veriseal — independent verifier</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
@@ -216,6 +218,8 @@
     font-size: 12.5px; color: var(--ink-3); display: grid; gap: 6px;
   }
   footer code { font-family: var(--mono); color: var(--ink-2); }
+  .mono { font-family: var(--mono); }
+  [hidden] { display: none !important; }
   footer a { color: var(--accent); text-decoration: none; }
 
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
@@ -274,7 +278,7 @@
 
   <div class="actions">
     <button class="reset" id="reset" type="button">Clear</button>
-    <button class="reset" id="tamper" type="button" style="display:none">Tamper a byte &amp; re-verify</button>
+    <button class="reset" id="tamper" type="button" hidden>Tamper a byte &amp; re-verify</button>
     <span class="sample-note">No files handy? <a id="load-sample">Load a sample sealed log</a> to see a pass, then tamper it live.</span>
   </div>
 
@@ -312,23 +316,88 @@ function canonicalize(value) {
   throw new Error("cannot canonicalize " + typeof value);
 }
 
-/* Large integers (log_time in ns) exceed Number safety. Parse the raw JSON
-   text preserving them as BigInt so canonical bytes match Python exactly. */
-function parseSealPreservingBigInts(text) {
-  // Wrap bare large integers as BigInt via a reviver-free manual pass:
-  // JSON.parse loses precision, so we tag long integer literals first.
-  const tagged = text.replace(
-    /:(\s*)(-?\d{16,})(\s*[,}\]])/g,
-    (m, s1, num, tail) => `:${s1}"__BIGINT__${num}"${tail}`
-  );
-  const obj = JSON.parse(tagged);
-  const revive = (v) => {
-    if (typeof v === "string" && v.startsWith("__BIGINT__")) return BigInt(v.slice(10));
-    if (Array.isArray(v)) return v.map(revive);
-    if (v && typeof v === "object") { for (const k in v) v[k] = revive(v[k]); return v; }
-    return v;
-  };
-  return revive(obj);
+/* Parse a manifest exactly as strictly as the Python reference, so that both
+   accept and reject the same files. Integers only: Python's canonicaliser rejects
+   floats, so 1.7e18 or 1.0 must fail here too rather than be read as an integer.
+   Integers beyond 2^53 (log_time in ns) are kept exact as BigInt. Strings must be
+   well-formed Unicode, since Python cannot encode a lone surrogate as UTF-8. */
+function parseSeal(text) {
+  let i = 0;
+  const fail = (what) => { throw new Error(what + " at offset " + i); };
+  const skipWs = () => { while (i < text.length && " \t\n\r".includes(text[i])) i++; };
+  const loneSurrogate = /(^|[^\ud800-\udbff])[\udc00-\udfff]|[\ud800-\udbff](?![\udc00-\udfff])/;
+  const intToken = /-?(?:0|[1-9][0-9]*)/y;
+  const maxSafe = BigInt(Number.MAX_SAFE_INTEGER);
+
+  function parseString() {
+    const start = i++;
+    while (i < text.length && text[i] !== '"') i += text[i] === "\\" ? 2 : 1;
+    if (i >= text.length) fail("unterminated string");
+    i++;
+    const str = JSON.parse(text.slice(start, i));
+    if (loneSurrogate.test(str)) fail("string is not well-formed Unicode");
+    return str;
+  }
+  function parseNumber() {
+    intToken.lastIndex = i;
+    const m = intToken.exec(text);
+    if (!m) fail("malformed number");
+    i = intToken.lastIndex;
+    if (i < text.length && ".eE".includes(text[i])) {
+      fail("non-integer number (a veriseal manifest contains integers only)");
+    }
+    const n = BigInt(m[0]);
+    return n > maxSafe || n < -maxSafe ? n : Number(n);
+  }
+  function parseValue() {
+    skipWs();
+    const c = text[i];
+    if (c === "{") {
+      i++;
+      const obj = {};
+      skipWs();
+      if (text[i] === "}") { i++; return obj; }
+      for (;;) {
+        skipWs();
+        if (text[i] !== '"') fail("expected a key");
+        const key = parseString();
+        skipWs();
+        if (text[i++] !== ":") fail("expected ':'");
+        // defineProperty, not obj[key] = …, so a "__proto__" key stays plain data
+        Object.defineProperty(obj, key, {
+          value: parseValue(), enumerable: true, writable: true, configurable: true,
+        });
+        skipWs();
+        if (text[i] === ",") { i++; continue; }
+        if (text[i] === "}") { i++; return obj; }
+        fail("expected ',' or '}'");
+      }
+    }
+    if (c === "[") {
+      i++;
+      const arr = [];
+      skipWs();
+      if (text[i] === "]") { i++; return arr; }
+      for (;;) {
+        arr.push(parseValue());
+        skipWs();
+        if (text[i] === ",") { i++; continue; }
+        if (text[i] === "]") { i++; return arr; }
+        fail("expected ',' or ']'");
+      }
+    }
+    if (c === '"') return parseString();
+    if (c === "-" || (c >= "0" && c <= "9")) return parseNumber();
+    for (const [word, val] of [["true", true], ["false", false], ["null", null]]) {
+      if (text.startsWith(word, i)) { i += word.length; return val; }
+    }
+    fail("unexpected character");
+  }
+
+  const value = parseValue();
+  skipWs();
+  if (i !== text.length) fail("unexpected data after the manifest");
+  return value;
 }
 
 /* ---- hex / base64 helpers ---- */
@@ -439,9 +508,9 @@ async function runVerification() {
 
   let manifest;
   try {
-    manifest = parseSealPreservingBigInts(new TextDecoder().decode(state.seal));
+    manifest = parseSeal(new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(state.seal));
   } catch (e) {
-    render({ status: "bad", parseError: "The seal manifest is not valid JSON." });
+    render({ status: "bad", parseError: "The seal manifest could not be read: " + e.message + "." });
     return;
   }
   if (!manifest.signature || !manifest.merkle || !manifest.source || !manifest.leaves) {
@@ -495,8 +564,22 @@ async function runVerification() {
   render({ status, result });
 }
 
-/* ---- rendering ---- */
+/* ---- rendering ----
+   Everything is built with createElement + text nodes, never innerHTML: values
+   come from the files being checked, and a hostile file must not inject markup. */
 const el = (id) => document.getElementById(id);
+
+function h(tag, cls, ...children) {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  node.append(...children);  // strings become text nodes
+  return node;
+}
+
+function noteRow(cls, mark, text) {
+  return h("div", "check " + cls, h("span", "mark", mark),
+    h("div", null, h("div", "name", "What this means"), h("div", "desc", text)));
+}
 
 function render(view) {
   const verdict = el("verdict");
@@ -504,7 +587,7 @@ function render(view) {
   const title = el("v-title");
   const sub = el("v-sub");
   const checks = el("checks");
-  checks.innerHTML = "";
+  checks.replaceChildren();
 
   verdict.className = "verdict state-" + (view.status || "idle");
 
@@ -527,11 +610,12 @@ function render(view) {
   if (view.status === "ok") {
     badge.textContent = "✓";
     title.textContent = "VERIFIED";
-    sub.innerHTML = `Pinned signer &middot; key <code style="font-family:var(--mono)">${r.fingerprint.slice(0,16)}…</code> matches &middot; ${r.manifest.messages.count} messages`;
+    sub.replaceChildren("Pinned signer · key ", h("code", "mono", r.fingerprint.slice(0, 16) + "…"),
+      " matches · " + r.manifest.messages.count + " messages");
   } else if (view.status === "warn") {
     badge.textContent = "!";
     title.textContent = "AUTHENTICITY NOT ESTABLISHED";
-    sub.innerHTML = "Signature, Merkle root, and file bytes all check out &mdash; but no signer key is pinned. A tampered log re-signed with a different key would look identical. Paste the signer's key above to establish authenticity.";
+    sub.textContent = "Signature, Merkle root, and file bytes all check out — but no signer key is pinned. A tampered log re-signed with a different key would look identical. Paste the signer's key above to establish authenticity.";
   } else if (r.pinned && !r.keyMatch && r.sigOk && r.rootOk && r.fileOk) {
     badge.textContent = "✗";
     title.textContent = "SIGNER MISMATCH";
@@ -596,22 +680,16 @@ function render(view) {
   }
 
   if (view.status === "warn") {
-    const note = document.createElement("div");
-    note.className = "check warn";
-    note.innerHTML = `<span class="mark">!</span><div><div class="name">What this means</div><div class="desc">Integrity checks pass, but authenticity is not established. Pin the signer's key (paste it above) to reach a green VERIFIED. Until then, treat the signer as unproven — anyone could have produced this seal.</div></div>`;
-    checks.appendChild(note);
+    checks.appendChild(noteRow("warn", "!", "Integrity checks pass, but authenticity is not established. Pin the signer's key (paste it above) to reach a green VERIFIED. Until then, treat the signer as unproven — anyone could have produced this seal."));
   } else if (!r.intact) {
-    const note = document.createElement("div");
-    note.className = "check fail";
     const why = (r.pinned && !r.keyMatch && r.sigOk && r.rootOk && r.fileOk)
       ? "The log is internally consistent but was signed by a different key than the one you pinned — a wrong signer, or a tampered log re-signed after the fact."
       : "Because a check failed, do not treat this log as evidence — it was modified after sealing, or the wrong file/manifest pair was loaded.";
-    note.innerHTML = `<span class="mark">✗</span><div><div class="name">What this means</div><div class="desc">${why}</div></div>`;
-    checks.appendChild(note);
+    checks.appendChild(noteRow("fail", "✗", why));
   }
 }
 
-function short(hex) { return hex.slice(0, 24) + "…" + hex.slice(-8); }
+function short(hex) { const s = String(hex); return s.slice(0, 24) + "…" + s.slice(-8); }
 
 function checkRow(status, name, desc, kvs) {
   const cls = status === true ? "pass" : status === false ? "fail" : status;
@@ -619,12 +697,12 @@ function checkRow(status, name, desc, kvs) {
   div.className = "check " + cls;
   const mark = status === true ? "✓" : status === false ? "✗"
              : status === "info" ? "◉" : status === "warn" ? "!" : "○";
-  let kvHtml = "";
+  const body = h("div", null, h("div", "name", name), h("div", "desc", desc));
   if (kvs && kvs.length) {
-    kvHtml = '<div class="kv">' + kvs.map(([l, v, cls2]) =>
-      `<div class="row"><span class="lbl">${l}</span><span class="val ${cls2||""}">${v}</span></div>`).join("") + "</div>";
+    body.append(h("div", "kv", ...kvs.map(([l, v, cls2]) =>
+      h("div", "row", h("span", "lbl", l), h("span", "val " + (cls2 || ""), String(v))))));
   }
-  div.innerHTML = `<span class="mark">${mark}</span><div><div class="name">${name}</div><div class="desc">${desc}</div>${kvHtml}</div>`;
+  div.append(h("span", "mark", mark), body);
   return div;
 }
 
@@ -632,6 +710,7 @@ function checkRow(status, name, desc, kvs) {
 function wireDrop(dropId, inputId, kind) {
   const drop = el(dropId), input = el(inputId);
   const onFile = (file) => {
+    input.value = "";  // so choosing the same file again still fires "change"
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
@@ -656,12 +735,9 @@ function wireDrop(dropId, inputId, kind) {
 function markLoaded(drop, kind, name, size) {
   drop.classList.add("loaded");
   const role = kind === "mcap" ? "Sealed log" : "Seal manifest";
-  drop.innerHTML = `<span class="role">${role}</span>` +
-    `<span class="fname">${name}</span>` +
-    `<span class="meta">${(size/1024).toFixed(1)} KB &middot; loaded</span>` +
-    drop.querySelector("input").outerHTML;
-  // re-wire the freshly written input
-  wireDrop(drop.id, drop.querySelector("input").id, kind);
+  // Keep the existing <input> (and its listeners); the file name is shown as text.
+  drop.replaceChildren(h("span", "role", role), h("span", "fname", name),
+    h("span", "meta", (size / 1024).toFixed(1) + " KB · loaded"), drop.querySelector("input"));
 }
 
 wireDrop("drop-mcap", "file-mcap", "mcap");
@@ -692,7 +768,7 @@ el("load-sample").addEventListener("click", async () => {
   } catch (e) { /* leave unpinned */ }
   markLoaded(el("drop-mcap"), "mcap", "sample.mcap", state.mcap.length);
   markLoaded(el("drop-seal"), "seal", "sample.seal.json", state.seal.length);
-  el("tamper").style.display = "";
+  el("tamper").hidden = false;
   await runVerification();
 });
 

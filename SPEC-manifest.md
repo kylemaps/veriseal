@@ -28,6 +28,8 @@ json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow
 
 > **No floating-point numbers.** The signed payload MUST contain only integers, never floats. Python and JavaScript serialize floats differently (e.g. `1.0` vs `1`, and they disagree on precision/exponent formatting), which would make the canonical bytes — and thus the signature — diverge between a Python and a browser verifier. veriseal's schema is all-integer (nanosecond times, byte sizes, counts); `veriseal seal` rejects any float in the payload rather than emit non-portable canonical bytes.
 
+> **Parsing.** A verifier MUST reject a manifest that the reference would reject, not repair it. In particular it MUST reject any number written with a fraction or exponent (`1.0`, `1.7e18`), even when its value is a whole number, because the reference reads it as a float and refuses it; it MUST keep integers above 2^53 exact; and it MUST reject strings that are not well-formed Unicode (a lone surrogate such as `"\ud800"`), which cannot be encoded as UTF-8. [`conformance/parse-cases.json`](conformance/parse-cases.json) lists inputs and the canonical bytes (or rejection) each must produce.
+
 > **String ordering.** Object keys and leaf sort keys are ordered by Unicode **code point** (Python's default string comparison). A conforming verifier that compares strings by UTF-16 code unit (JavaScript's default `<`) agrees for the Basic Multilingual Plane, but can disagree for astral-plane characters (above U+FFFF). Topic strings are expected to be ASCII; do not rely on a particular ordering of astral-plane topic names.
 
 ---

@@ -5,7 +5,7 @@ import { createRoot } from "react-dom/client";
 import {
   checkSeal,
   crossCheckShape,
-  parseManifestPreservingBigInts,
+  parseManifest,
   SealCheckResult,
   SealManifest,
 } from "./sealcore";
@@ -73,11 +73,11 @@ function SealCheckPanel({ context }: { context: PanelExtensionContext }): ReactE
     setResult(undefined);
     let parsed: SealManifest;
     try {
-      parsed = parseManifestPreservingBigInts(text);
-    } catch {
+      parsed = parseManifest(text);
+    } catch (err) {
       setManifest(undefined);
       setManifestName(name);
-      setParseError("That file is not valid JSON.");
+      setParseError(`That file is not a readable manifest: ${(err as Error).message}.`);
       return;
     }
     setManifest(parsed);

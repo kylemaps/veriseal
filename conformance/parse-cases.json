@@ -1,0 +1,85 @@
+{
+  "about": "Manifest texts a verifier must parse exactly like the Python reference. canonical is the canonical JSON (SPEC-manifest.md 1) of the parsed text, or null where the reference rejects the text and so must every verifier.",
+  "cases": [
+    {
+      "text": "{\"log_time\":1700000000000000000,\"count\":3}",
+      "canonical": "{\"count\":3,\"log_time\":1700000000000000000}"
+    },
+    {
+      "text": "{\"log_time\":1.7e18}",
+      "canonical": null
+    },
+    {
+      "text": "{\"n\":1.0}",
+      "canonical": null
+    },
+    {
+      "text": "{\"n\":1e3}",
+      "canonical": null
+    },
+    {
+      "text": "{\"n\":1E3}",
+      "canonical": null
+    },
+    {
+      "text": "{\"n\":-0}",
+      "canonical": "{\"n\":0}"
+    },
+    {
+      "text": "{\"n\":-12345678901234567890}",
+      "canonical": "{\"n\":-12345678901234567890}"
+    },
+    {
+      "text": "{\"n\":01}",
+      "canonical": null
+    },
+    {
+      "text": "{\"n\":NaN}",
+      "canonical": null
+    },
+    {
+      "text": "{\"n\":Infinity}",
+      "canonical": null
+    },
+    {
+      "text": "{\"s\":\"\\ud800\"}",
+      "canonical": null
+    },
+    {
+      "text": "{\"s\":\"\\udc00x\"}",
+      "canonical": null
+    },
+    {
+      "text": "{\"s\":\"\\ud83d\\ude00 ok\"}",
+      "canonical": "{\"s\":\"\ud83d\ude00 ok\"}"
+    },
+    {
+      "text": "{\"s\":\"<img src=x onerror=alert(1)>\"}",
+      "canonical": "{\"s\":\"<img src=x onerror=alert(1)>\"}"
+    },
+    {
+      "text": "{\"__proto__\":{\"x\":1},\"a\":[1,2,{\"b\":null}]}",
+      "canonical": "{\"__proto__\":{\"x\":1},\"a\":[1,2,{\"b\":null}]}"
+    },
+    {
+      "text": "{\"a\":1} trailing",
+      "canonical": null
+    },
+    {
+      "text": "{\"a\":1,}",
+      "canonical": null
+    },
+    {
+      "text": "[1,2,3]",
+      "canonical": "[1,2,3]"
+    },
+    {
+      "text": "{\"b\":2,\"a\":1,\"b\":3}",
+      "canonical": "{\"a\":1,\"b\":3}"
+    },
+    {
+      "text": " \n{\"a\" : [ true , false ] }\n ",
+      "canonical": "{\"a\":[true,false]}"
+    }
+  ]
+}

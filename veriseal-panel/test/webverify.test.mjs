@@ -71,13 +71,13 @@ check("inline crypto functions are defined", typeof sandbox.recomputeMerkle === 
 //    this does not distinguish those two specifically — it locks the output to the
 //    Python reference against any future change.)
 const large = JSON.parse(readFileSync(join(here, "fixtures", "large-leaves.json"), "utf8"));
-const largeManifest = sandbox.parseSealPreservingBigInts(JSON.stringify({ leaves: large.leaves }));
+const largeManifest = sandbox.parseSeal(JSON.stringify({ leaves: large.leaves }));
 const largeRoot = await sandbox.recomputeMerkle(largeManifest);
 check(`large leaf count (n=${large.leaves.length}) root matches Python`, largeRoot === large.root);
 
 // 4. Full check on the CLI-sealed sample: signature + Merkle root.
 const sealText = readFileSync(join(here, "fixtures", "sample.seal.json"), "utf8");
-const manifest = sandbox.parseSealPreservingBigInts(sealText);
+const manifest = sandbox.parseSeal(sealText);
 const sampleRoot = await sandbox.recomputeMerkle(manifest);
 check("sample seal Merkle root matches Python-signed root", sampleRoot === EXPECTED_SAMPLE_ROOT);
 const sig = await sandbox.verifySignature(manifest);
@@ -95,7 +95,7 @@ vm.runInContext(sampleBody, sandbox);
 const sample = sandbox.window.__SAMPLE__;
 check("embedded sample present", sample != null && typeof sample.mcapHex === "string");
 
-const sampleManifest = sandbox.parseSealPreservingBigInts(sample.sealJson);
+const sampleManifest = sandbox.parseSeal(sample.sealJson);
 const mcap = sandbox.hexToBytes(sample.mcapHex);
 
 async function fileOk(bytes) {

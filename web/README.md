@@ -42,6 +42,22 @@ The JS in `verify.html` mirrors the Python reference implementation byte-for-byt
 
 If the manifest format or hashing changes in the Python code, update `verify.html` to match.
 
+It also parses the manifest as strictly as Python does: integers only (so `1.7e18` or `1.0` is
+rejected, as the Python canonicaliser rejects floats), integers beyond 2^53 kept exact, and
+well-formed Unicode only. [`conformance/parse-cases.json`](../conformance/parse-cases.json) lists
+the inputs that must be accepted or rejected; the tests run the page's own parser against it.
+
+## Hostile files
+
+The page renders values read from the files it checks, so it treats them as hostile:
+
+- The page is built with text nodes only (no `innerHTML`), so a value such as
+  `<img src=x onerror=alert(1)>` in a seal file is shown as text, never run.
+- A `Content-Security-Policy` meta tag allows nothing but the page's own inline script and style,
+  pinned by SHA-256 hash: no network requests, no other scripts, no inline event handlers. If you
+  edit the `<script>` or `<style>`, update the hashes; `tests/test_web_verifier_hardening.py`
+  fails and prints the new policy.
+
 ## Scope / limitations
 
 - **Full-file integrity, not per-message localization.** The file-digest check catches any

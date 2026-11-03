@@ -13,6 +13,11 @@
 - `verify --check-bitcoin` and `pack --check-bitcoin`: check the anchor's Bitcoin attestation against the block header, fetched from mempool.space and blockstream.info, which must agree. The result is "verified against Bitcoin" (with block hash and time), "FALSE" (the block doesn't contain the proof) or "could not check" (with the reason).
 - `verify --allow-unpinned`.
 
+### Security
+
+- Web verifier: a seal file could inject HTML and run script in the page (for example through `messages.count` or `source.size_bytes`). The page now builds its content with text only and ships a Content-Security-Policy that allows only its own inline script and style.
+- Web verifier and Foxglove panel: a manifest with a float such as `1.7e18` was read as an integer and could pass, although the Python verifier rejects it. Both now parse as strictly as Python; the cases are in `conformance/parse-cases.json`.
+
 ### Fixed
 
 - A Bitcoin attestation that hasn't been checked against Bitcoin is reported as "calendar-attested, not checked against Bitcoin", never as confirmed, in `verify`, the pack report and the web verifier.

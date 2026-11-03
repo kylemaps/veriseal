@@ -79,31 +79,117 @@ export function canonicalize(value: unknown): string {
   throw new Error("cannot canonicalize " + typeof value);
 }
 
-/* Large integers (log_time ns) exceed Number safety. Parse the raw JSON text
-   preserving them as BigInt so canonical bytes match Python exactly. */
-export function parseManifestPreservingBigInts(text: string): SealManifest {
-  const tagged = text.replace(
-    /:(\s*)(-?\d{16,})(\s*[,}\]])/g,
-    (_m, s1: string, num: string, tail: string) => `:${s1}"__BIGINT__${num}"${tail}`,
-  );
-  const obj = JSON.parse(tagged) as unknown;
-  const revive = (v: unknown): unknown => {
-    if (typeof v === "string" && v.startsWith("__BIGINT__")) {
-      return BigInt(v.slice(10));
-    }
-    if (Array.isArray(v)) {
-      return v.map(revive);
-    }
-    if (v != null && typeof v === "object") {
-      const o = v as Record<string, unknown>;
-      for (const k of Object.keys(o)) {
-        o[k] = revive(o[k]);
-      }
-      return o;
-    }
-    return v;
+/* Parse a manifest exactly as strictly as the Python reference, so both accept
+   and reject the same files. Integers only: Python's canonicaliser rejects floats,
+   so 1.7e18 or 1.0 must fail here too rather than be read as an integer. Integers
+   beyond 2^53 (log_time ns) are kept exact as BigInt. Strings must be well-formed
+   Unicode, since Python cannot encode a lone surrogate as UTF-8. Same algorithm as
+   parseSeal in web/verify.html. */
+export function parseManifest(text: string): SealManifest {
+  let i = 0;
+  const fail = (what: string): never => {
+    throw new Error(`${what} at offset ${i}`);
   };
-  return revive(obj) as SealManifest;
+  const skipWs = (): void => {
+    while (i < text.length && " \t\n\r".includes(text[i]!)) {i++;}
+  };
+  const loneSurrogate = /(^|[^\ud800-\udbff])[\udc00-\udfff]|[\ud800-\udbff](?![\udc00-\udfff])/;
+  const intToken = /-?(?:0|[1-9][0-9]*)/y;
+  const maxSafe = BigInt(Number.MAX_SAFE_INTEGER);
+
+  const parseString = (): string => {
+    const start = i++;
+    while (i < text.length && text[i] !== '"') {i += text[i] === "\\" ? 2 : 1;}
+    if (i >= text.length) {fail("unterminated string");}
+    i++;
+    const str = JSON.parse(text.slice(start, i)) as string;
+    if (loneSurrogate.test(str)) {fail("string is not well-formed Unicode");}
+    return str;
+  };
+  const parseNumber = (): number | bigint => {
+    intToken.lastIndex = i;
+    const m = intToken.exec(text);
+    if (m == null) {return fail("malformed number");}
+    i = intToken.lastIndex;
+    if (i < text.length && ".eE".includes(text[i]!)) {
+      fail("non-integer number (a veriseal manifest contains integers only)");
+    }
+    const n = BigInt(m[0]);
+    return n > maxSafe || n < -maxSafe ? n : Number(n);
+  };
+  const parseValue = (): unknown => {
+    skipWs();
+    const c = text[i];
+    if (c === "{") {
+      i++;
+      const obj: Record<string, unknown> = {};
+      skipWs();
+      if (text[i] === "}") {
+        i++;
+        return obj;
+      }
+      for (;;) {
+        skipWs();
+        if (text[i] !== '"') {fail("expected a key");}
+        const key = parseString();
+        skipWs();
+        if (text[i++] !== ":") {fail("expected ':'");}
+        // defineProperty, not obj[key] = …, so a "__proto__" key stays plain data
+        Object.defineProperty(obj, key, {
+          value: parseValue(),
+          enumerable: true,
+          writable: true,
+          configurable: true,
+        });
+        skipWs();
+        if (text[i] === ",") {
+          i++;
+          continue;
+        }
+        if (text[i] === "}") {
+          i++;
+          return obj;
+        }
+        fail("expected ',' or '}'");
+      }
+    }
+    if (c === "[") {
+      i++;
+      const arr: unknown[] = [];
+      skipWs();
+      if (text[i] === "]") {
+        i++;
+        return arr;
+      }
+      for (;;) {
+        arr.push(parseValue());
+        skipWs();
+        if (text[i] === ",") {
+          i++;
+          continue;
+        }
+        if (text[i] === "]") {
+          i++;
+          return arr;
+        }
+        fail("expected ',' or ']'");
+      }
+    }
+    if (c === '"') {return parseString();}
+    if (c === "-" || (c != null && c >= "0" && c <= "9")) {return parseNumber();}
+    for (const [word, val] of [["true", true], ["false", false], ["null", null]] as const) {
+      if (text.startsWith(word, i)) {
+        i += word.length;
+        return val;
+      }
+    }
+    return fail("unexpected character");
+  };
+
+  const value = parseValue();
+  skipWs();
+  if (i !== text.length) {fail("unexpected data after the manifest");}
+  return value as SealManifest;
 }
 
 /* ---- hex / base64 / PEM helpers ----
