@@ -368,3 +368,38 @@ def test_pack_stays_offline_unless_asked(tmp_path: Path) -> None:
     mcap, seal_path, _ = _anchored_seal(tmp_path, 900_000)
     report = _report(tmp_path, mcap, seal_path, check=False)
     assert "report was built without comparing it with the block itself" in report
+
+
+# ── a real proof from the public calendars, against its real block ───────────
+
+VECTOR = json.loads(
+    (Path(__file__).resolve().parents[1] / "conformance" / "bitcoin-check.json").read_text(
+        encoding="utf-8"
+    )
+)
+
+
+def _recorded_explorers(header: bytes) -> dict[str, dict[int, bytes]]:
+    return _everywhere({VECTOR["bitcoin_block_height"]: header})
+
+
+def test_real_calendar_proof_verifies_against_its_recorded_block() -> None:
+    digest = hashlib.sha256(VECTOR["message"].encode("ascii")).digest()
+    assert digest.hex() == VECTOR["digest_sha256"]
+    header = bytes.fromhex(VECTOR["block_header_hex"])
+    assert block_hash(header) == VECTOR["block_hash"]
+    get, _ = _explorers(_recorded_explorers(header))
+    result = check_bitcoin(digest, base64.b64decode(VECTOR["ots_base64"]), SOURCES, get)
+    assert result.status == "verified"
+    assert result.height == VECTOR["bitcoin_block_height"]
+    assert result.block_hash == VECTOR["block_hash"]
+    assert result.block_time == VECTOR["block_time_unix"]
+
+
+def test_real_calendar_proof_is_false_against_an_altered_block() -> None:
+    digest = bytes.fromhex(VECTOR["digest_sha256"])
+    header = bytearray.fromhex(VECTOR["block_header_hex"])
+    header[40] ^= 0x01  # one bit of the Merkle root field
+    get, _ = _explorers(_recorded_explorers(bytes(header)))
+    result = check_bitcoin(digest, base64.b64decode(VECTOR["ots_base64"]), SOURCES, get)
+    assert result.status == "false"

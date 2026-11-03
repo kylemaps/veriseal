@@ -4,9 +4,11 @@ Test vectors for anyone writing an independent verifier against
 [SPEC-manifest.md](../SPEC-manifest.md). A conforming implementation needs only that
 document, these files, and standard SHA-256 / Ed25519 libraries — not this codebase.
 
-Every vector here is exercised in CI by
-[`tests/test_conformance_vectors.py`](../tests/test_conformance_vectors.py), so the
-expected results below cannot silently drift from what the tool actually does.
+Every vector here is exercised in CI, by
+[`tests/test_conformance_vectors.py`](../tests/test_conformance_vectors.py),
+[`tests/test_web_verifier_hardening.py`](../tests/test_web_verifier_hardening.py) and
+[`tests/test_check_bitcoin.py`](../tests/test_check_bitcoin.py), so the expected results below
+cannot silently drift from what the tool actually does.
 
 ## Vectors
 
@@ -15,6 +17,8 @@ expected results below cannot silently drift from what the tool actually does.
 | `sample_ros1.mcap` + `sample_ros1.seal.json` | MCAP | **INTACT** — all checks pass |
 | `sample_ros1.tampered.mcap` + `sample_ros1.seal.json` | MCAP | **TAMPERED** — see below |
 | `sample.bag` + `sample.bag.seal.json` + `sample.bag.pub.pem` | ROS 1 bag | **INTACT**, including a signer-key pin |
+| `parse-cases.json` | manifest text | each text's canonical JSON, or rejection (`null`) |
+| `bitcoin-check.json` | OpenTimestamps proof + Bitcoin block header | the proof **verifies** against the header |
 
 ### `sample_ros1.mcap` — the INTACT vector
 
@@ -84,6 +88,21 @@ time = datetime(2026, 7, 20, 12, 0, 0, tzinfo=UTC)
 > get byte-identical output. It is not a key, it protects nothing, and it must never be
 > used to seal anything real. The private key for the MCAP vector is deliberately **not**
 > in this repository.
+
+### `parse-cases.json` — parsing like the reference
+
+Checks a verifier's JSON parsing against SPEC-manifest.md §1. Numbers with a fraction or
+exponent (such as `1.7e18`) and lone surrogates must be rejected, and large integers kept
+exact. The Python reference, the web verifier and the Foxglove panel are all tested against it.
+
+### `bitcoin-check.json` — the Bitcoin check
+
+Checks the Bitcoin step of SPEC-manifest.md §6. It holds a real proof from the public
+OpenTimestamps calendars for the SHA-256 of a short message, and the 80-byte header of the
+block the proof names (block 974347, as served by mempool.space and blockstream.info). Running
+the proof's operations from the digest must give that header's Merkle root (bytes 36–68), and
+the header must hash to `block_hash`. Changing any bit of the header's Merkle root must make
+the check fail.
 
 ## Checking your implementation
 
