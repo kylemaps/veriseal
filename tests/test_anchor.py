@@ -175,7 +175,7 @@ def test_no_anchor_signature_still_valid(mcap_path: Path, tmp_path: Path) -> Non
         out_path=seal_path,
         do_anchor=False,
     )
-    assert verify_seal(mcap_path, seal_path) == 0
+    assert verify_seal(mcap_path, seal_path, allow_unpinned=True) == 0
 
 
 # ── verify_anchor directly ───────────────────────────────────────────────────
@@ -245,7 +245,7 @@ def test_anchor_commits_mismatch_detected(
 
     # Anchor is EXCLUDED from the signed payload, so sig + Merkle still pass → INTACT.
     # The anchor INVALID message is printed as informational output only.
-    result = verify_seal(mcap_path, patched_seal)
+    result = verify_seal(mcap_path, patched_seal, allow_unpinned=True)
     assert result == 0  # INTACT: anchor is informational, not part of the exit code
 
 
@@ -261,7 +261,7 @@ def test_prior_verify_intact_with_no_anchor(mcap_path: Path, tmp_path: Path) -> 
         out_path=seal_path,
         do_anchor=False,
     )
-    assert verify_seal(mcap_path, seal_path) == 0
+    assert verify_seal(mcap_path, seal_path, allow_unpinned=True) == 0
 
 
 def test_prior_verify_tampered_with_no_anchor(mcap_path: Path, tmp_path: Path) -> None:

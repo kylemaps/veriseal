@@ -94,7 +94,7 @@ def test_intact_requires_source_ok(tmp_path: Path) -> None:
     result = run_verification(mcap, manifest)
     assert result.source_ok is True
     assert result.ok is True
-    assert verify_seal(mcap, seal_path) == 0
+    assert verify_seal(mcap, seal_path, allow_unpinned=True) == 0
 
 
 # ── item 5: edge cases ───────────────────────────────────────────────────────
@@ -104,7 +104,7 @@ def test_duplicate_identical_messages_intact(tmp_path: Path) -> None:
     dup = [("/pose", 1_000_000, b"\x01"), ("/pose", 1_000_000, b"\x01")]
     mcap = _write_mcap(tmp_path / "dup.mcap", dup)
     seal_path = _seal(mcap, tmp_path)
-    assert verify_seal(mcap, seal_path) == 0
+    assert verify_seal(mcap, seal_path, allow_unpinned=True) == 0
 
 
 def test_duplicate_message_modification_localised(tmp_path: Path) -> None:
@@ -128,13 +128,13 @@ def test_empty_mcap_roundtrip(tmp_path: Path) -> None:
     seal_path = _seal(mcap, tmp_path)
     manifest = json.loads(seal_path.read_bytes())
     assert manifest["messages"]["count"] == 0
-    assert verify_seal(mcap, seal_path) == 0
+    assert verify_seal(mcap, seal_path, allow_unpinned=True) == 0
 
 
 def test_single_message_roundtrip(tmp_path: Path) -> None:
     mcap = _write_mcap(tmp_path / "one.mcap", [("/pose", 1_000_000, b"\x01")])
     seal_path = _seal(mcap, tmp_path)
-    assert verify_seal(mcap, seal_path) == 0
+    assert verify_seal(mcap, seal_path, allow_unpinned=True) == 0
 
 
 def test_truncated_mcap_is_usage_error(tmp_path: Path) -> None:
@@ -179,4 +179,4 @@ def test_various_sizes_roundtrip(tmp_path: Path, n: int) -> None:
     msgs = [("/pose", (i + 1) * 1000, bytes([i % 256])) for i in range(n)]
     mcap = _write_mcap(tmp_path / f"n{n}.mcap", msgs)
     seal_path = _seal(mcap, tmp_path, name=f"n{n}")
-    assert verify_seal(mcap, seal_path) == 0
+    assert verify_seal(mcap, seal_path, allow_unpinned=True) == 0

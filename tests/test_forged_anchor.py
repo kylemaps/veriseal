@@ -144,7 +144,9 @@ def test_unchecked_attestation_is_reported_as_calendar_attested(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     mcap, made_up_seal = _seal_with_made_up_attestation(tmp_path)
-    assert verify_seal(mcap, made_up_seal) == 0  # anchors stay informational by default
+    assert (
+        verify_seal(mcap, made_up_seal, allow_unpinned=True) == 0
+    )  # anchors stay informational by default
     out = " ".join(capsys.readouterr().out.split())
     assert "Anchor: calendar-attested, Bitcoin block #820001 (not checked against Bitcoin" in out
     assert "confirmed" not in out.lower()

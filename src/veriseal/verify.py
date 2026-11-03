@@ -242,6 +242,7 @@ def verify_seal(
     pubkey_path: Path | None = None,
     require_anchor: bool = False,
     check_bitcoin: bool = False,
+    allow_unpinned: bool = False,
 ) -> int:
     """
     Verify *mcap_path* against *seal_path* and print a Rich report.
@@ -250,9 +251,11 @@ def verify_seal(
     reports the result; *require_anchor* implies it and fails unless it succeeds.
 
     Returns:
-        0  — INTACT (signature valid AND Merkle root matches AND pubkey/anchor checks pass)
+        0  — INTACT, signed by the pinned key (or *allow_unpinned*), anchor checks pass
         1  — TAMPERED, key mismatch, or --require-anchor not met
         2  — usage / parse error
+        3  — INTACT, but no key was pinned: the embedded key was trusted, so a re-seal
+             by anyone else would pass too
     """
     check_bitcoin = check_bitcoin or require_anchor
     try:
@@ -275,8 +278,9 @@ def verify_seal(
     root_hex = manifest["merkle"]["root"]
 
     if result.ok:
+        pin_note = "" if result.pubkey_pinned else " (signer not pinned)"
         console.print(
-            f"[bold green]INTACT[/bold green]: signature valid, "
+            f"[bold green]INTACT[/bold green]{pin_note}: signature valid, "
             f"{n} messages, root {root_hex[:16]}..."
         )
         # Show the file-integrity check affirmatively too, so the source status
@@ -378,7 +382,15 @@ def verify_seal(
                 "manifest and be verified against a Bitcoin block"
             )
 
-    return 0 if (result.ok and not anchor_fail) else 1
+    if not result.ok or anchor_fail:
+        return 1
+    if not result.pubkey_pinned and not allow_unpinned:
+        console.print(
+            "  Exit code 3: intact, but the signer is not pinned "
+            "(pass --pubkey, or --allow-unpinned to accept)"
+        )
+        return 3
+    return 0
 
 
 def source_names(sources: tuple[str, ...]) -> str:

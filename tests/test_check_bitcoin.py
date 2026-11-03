@@ -260,7 +260,7 @@ def test_require_anchor_passes_once_checked_against_bitcoin(
 ) -> None:
     mcap, seal_path, digest = _anchored_seal(tmp_path, 900_000)
     _use_explorers(monkeypatch, _everywhere({900_000: _header(digest)}))
-    assert verify_seal(mcap, seal_path, require_anchor=True) == 0
+    assert verify_seal(mcap, seal_path, require_anchor=True, allow_unpinned=True) == 0
     out = _out(capsys)
     assert "Anchor: verified against Bitcoin, block #900000 (2026-08-17 04:05 UTC)" in out
     assert f"block hash {block_hash(_header(digest))}" in out
@@ -295,7 +295,7 @@ def test_check_bitcoin_reports_without_changing_the_exit_code(
     """Like every anchor result, a false attestation only fails under --require-anchor."""
     mcap, seal_path, _ = _anchored_seal(tmp_path, 900_000)
     _use_explorers(monkeypatch, _everywhere({900_000: _header(bytes(32))}))
-    assert verify_seal(mcap, seal_path, check_bitcoin=True) == 0
+    assert verify_seal(mcap, seal_path, check_bitcoin=True, allow_unpinned=True) == 0
     assert "Anchor: FALSE" in _out(capsys)
 
 
@@ -304,7 +304,7 @@ def test_verify_stays_offline_unless_asked(
 ) -> None:
     """No flag, no request: the autouse network guard fails this test if one is made."""
     mcap, seal_path, _ = _anchored_seal(tmp_path, 900_000)
-    assert verify_seal(mcap, seal_path) == 0
+    assert verify_seal(mcap, seal_path, allow_unpinned=True) == 0
     assert "(not checked against Bitcoin; add --check-bitcoin)" in _out(capsys)
 
 
@@ -315,7 +315,9 @@ def test_cli_check_bitcoin_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
 
     mcap, seal_path, digest = _anchored_seal(tmp_path, 900_000)
     _use_explorers(monkeypatch, _everywhere({900_000: _header(digest)}))
-    result = CliRunner().invoke(app, ["verify", str(mcap), str(seal_path), "--check-bitcoin"])
+    result = CliRunner().invoke(
+        app, ["verify", str(mcap), str(seal_path), "--check-bitcoin", "--allow-unpinned"]
+    )
     assert result.exit_code == 0
     assert "verified against Bitcoin" in " ".join(result.stdout.split())
 

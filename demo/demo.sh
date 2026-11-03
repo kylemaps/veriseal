@@ -13,6 +13,7 @@ SAMPLE=demo/sample.mcap
 SEAL=demo/sample.seal.json
 TAMPERED=demo/tampered.mcap
 KEY=demo/demo.key.pem
+PUB=demo/demo.pub.pem
 
 echo "========================================"
 echo " 0. Generate synthetic sample MCAP"
@@ -23,14 +24,14 @@ echo
 echo "========================================"
 echo " 1. Create a demo signer key, then seal (no anchor for fast demo)"
 echo "========================================"
-veriseal keygen --out "$KEY" --force > /dev/null
+veriseal keygen --out "$KEY" --pub "$PUB" --force > /dev/null
 veriseal seal "$SAMPLE" --key "$KEY" --no-anchor --out "$SEAL"
 
 echo
 echo "========================================"
 echo " 2. Verify — expect INTACT"
 echo "========================================"
-veriseal verify "$SAMPLE" "$SEAL"
+veriseal verify "$SAMPLE" "$SEAL" --pubkey "$PUB"
 
 echo
 echo "========================================"
@@ -42,7 +43,7 @@ echo
 echo "========================================"
 echo " 4. Verify tampered copy — expect TAMPERED"
 echo "========================================"
-veriseal verify "$TAMPERED" "$SEAL" || true   # exit 1 is expected
+veriseal verify "$TAMPERED" "$SEAL" --pubkey "$PUB" || true   # exit 1 is expected
 
 echo
 echo "========================================"
@@ -57,7 +58,7 @@ echo
 echo "========================================"
 echo " 6. Pack — portable incident-evidence bundle"
 echo "========================================"
-veriseal pack "$SAMPLE" "$SEAL" --out demo/incident-pack
+veriseal pack "$SAMPLE" "$SEAL" --pubkey "$PUB" --out demo/incident-pack
 
 echo
 echo "Done."

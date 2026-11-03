@@ -49,14 +49,14 @@ mcap convert sample.bag sample.mcap
 
 ```bash
 veriseal seal sample.mcap --key signer.key.pem --no-anchor --out sample.seal.json
-veriseal verify sample.mcap sample.seal.json
-# INTACT — signature valid, 10 messages, root 9a75174f...
+veriseal verify sample.mcap sample.seal.json --pubkey signer.pub.pem
+# INTACT: signature valid, 10 messages, root 9a75174f...
 ```
 
 Tamper detection works the same as on a native MCAP log — flip a byte in a copy and re-verify:
 
 ```bash
-veriseal verify sample.tampered.mcap sample.seal.json
+veriseal verify sample.tampered.mcap sample.seal.json --pubkey signer.pub.pem
 # TAMPERED
 #   Source digest mismatch
 #   Merkle root mismatch

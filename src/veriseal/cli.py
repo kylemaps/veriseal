@@ -127,8 +127,20 @@ def verify(
             "Bitcoin block. Implies --check-bitcoin."
         ),
     ),
+    allow_unpinned: bool = typer.Option(
+        False,
+        "--allow-unpinned",
+        help=(
+            "Exit 0 for an INTACT log even without --pubkey, trusting the key embedded in the "
+            "manifest. Without it, that case exits 3."
+        ),
+    ),
 ) -> None:
-    """Recompute hashes, validate signature, report INTACT or TAMPERED (with location)."""
+    """Recompute hashes, validate signature, report INTACT or TAMPERED (with location).
+
+    Exit codes: 0 INTACT (signer pinned, or --allow-unpinned); 1 TAMPERED, signer
+    mismatch, or --require-anchor not met; 2 error; 3 INTACT but signer not pinned.
+    """
     from veriseal.verify import verify_seal
 
     raise typer.Exit(
@@ -138,6 +150,7 @@ def verify(
             pubkey_path=pubkey,
             require_anchor=require_anchor,
             check_bitcoin=check_bitcoin,
+            allow_unpinned=allow_unpinned,
         )
     )
 
@@ -175,7 +188,8 @@ def pack(
         path, seal_json, out, pubkey_path=pubkey, as_zip=zip_, check_bitcoin=check_bitcoin
     )
     if result.ok:
-        console.print(f"[bold green]Pack written[/bold green]: {result.out}  (INTACT)")
+        pinned = "" if pubkey is not None else ", signer not pinned"
+        console.print(f"[bold green]Pack written[/bold green]: {result.out}  (INTACT{pinned})")
     else:
         console.print(
             f"[bold yellow]Pack written[/bold yellow]: {result.out}  "

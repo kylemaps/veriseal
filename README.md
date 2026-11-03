@@ -44,9 +44,9 @@ veriseal seal log.mcap --key signer.key.pem --out log.seal.json
 # Or seal fully offline, without OpenTimestamps (same key)
 veriseal seal log.mcap --key signer.key.pem --no-anchor --out log.seal.json
 
-# Verify integrity (WARNING: without --pubkey the embedded key is trusted unconditionally)
+# Verify integrity without pinning a key: exits 3, because the embedded key is trusted
 veriseal verify log.mcap log.seal.json
-# INTACT: signature valid, 198 messages, root 9bfe72f8a52c5ad5...
+# INTACT (signer not pinned): signature valid, 198 messages, root 9bfe72f8a52c5ad5...
 #   WARNING: no --pubkey: trusting the key embedded in the manifest; ...
 
 # Verify and pin the signer's key: the only way to catch a tampered re-seal
@@ -108,6 +108,19 @@ veriseal pack log.mcap log.seal.json --out incident-pack --zip   # single .zip t
 # Later, fetch a pending timestamp's Bitcoin attestation from the calendars
 veriseal anchor upgrade log.seal.json
 ```
+
+### Exit codes
+
+`veriseal verify` exits with:
+
+| Code | Meaning |
+|---|---|
+| `0` | INTACT, and signed by the key you pinned with `--pubkey` (or you passed `--allow-unpinned`) |
+| `1` | TAMPERED, signed by a different key than the pinned one, or `--require-anchor` not met |
+| `2` | Error: unreadable log, manifest or key file |
+| `3` | INTACT, but no key was pinned. The key inside the manifest was trusted, so a re-seal by anyone with any key would also pass |
+
+Scripts that only care about integrity of their own seals can pass `--allow-unpinned` to turn `3` into `0`. `veriseal pack` exits `0` or `1`; its report says whether the key was pinned.
 
 ### OpenTimestamps anchor
 

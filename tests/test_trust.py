@@ -86,6 +86,68 @@ def test_pubkey_non_ed25519_returns_2(sealed_pair: tuple[Path, Path], tmp_path: 
     assert verify_seal(mcap, seal_path, pubkey_path=rsa_pub_path) == 2
 
 
+# ── unpinned verify: exit 3 unless --allow-unpinned ──────────────────────────
+
+
+def _out(capsys: pytest.CaptureFixture[str]) -> str:
+    return " ".join(capsys.readouterr().out.split())
+
+
+def test_unpinned_intact_exits_3(
+    sealed_pair: tuple[Path, Path], capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Trusting the embedded key means a re-seal by anyone passes, so it is not a clean 0."""
+    mcap, seal_path = sealed_pair
+    assert verify_seal(mcap, seal_path) == 3
+    out = _out(capsys)
+    assert "INTACT (signer not pinned): signature valid" in out
+    assert "Exit code 3" in out
+
+
+def test_allow_unpinned_exits_0(
+    sealed_pair: tuple[Path, Path], capsys: pytest.CaptureFixture[str]
+) -> None:
+    mcap, seal_path = sealed_pair
+    assert verify_seal(mcap, seal_path, allow_unpinned=True) == 0
+    out = _out(capsys)
+    assert "INTACT (signer not pinned)" in out  # still says so
+    assert "Exit code 3" not in out
+
+
+def test_pinned_intact_has_no_unpinned_note(
+    sealed_pair: tuple[Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    mcap, seal_path = sealed_pair
+    pub_path = tmp_path / "signer.pub.pem"
+    pub_path.write_text(json.loads(seal_path.read_bytes())["signature"]["public_key"])
+    assert verify_seal(mcap, seal_path, pubkey_path=pub_path) == 0
+    out = _out(capsys)
+    assert "INTACT: signature valid" in out
+    assert "not pinned" not in out
+
+
+def test_tampered_unpinned_still_exits_1(sealed_pair: tuple[Path, Path], tmp_path: Path) -> None:
+    _, seal_path = sealed_pair
+    other = _write_mcap(tmp_path / "other.mcap", [("/pose", 1_000_000, b"\xff")])
+    assert verify_seal(other, seal_path) == 1
+    assert verify_seal(other, seal_path, allow_unpinned=True) == 1
+
+
+def test_cli_exit_codes_for_pinning(sealed_pair: tuple[Path, Path], tmp_path: Path) -> None:
+    from typer.testing import CliRunner
+
+    from veriseal.cli import app
+
+    mcap, seal_path = sealed_pair
+    runner = CliRunner()
+    assert runner.invoke(app, ["verify", str(mcap), str(seal_path)]).exit_code == 3
+    allowed = runner.invoke(app, ["verify", str(mcap), str(seal_path), "--allow-unpinned"])
+    assert allowed.exit_code == 0
+    packed = runner.invoke(app, ["pack", str(mcap), str(seal_path), "--out", str(tmp_path / "p")])
+    assert packed.exit_code == 0  # the pack's exit code is unchanged; its message says it
+    assert "signer not pinned" in " ".join(packed.stdout.split())
+
+
 # ── --require-anchor tests ───────────────────────────────────────────────────
 
 

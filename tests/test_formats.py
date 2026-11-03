@@ -79,7 +79,7 @@ def test_verify_bag_intact(tmp_path: Path) -> None:
     bag = _write_bag(tmp_path / "in.bag", _MESSAGES)
     seal_path = tmp_path / "in.seal.json"
     seal(bag, new_key_path=bag.with_suffix(".key.pem"), out_path=seal_path, do_anchor=False)
-    assert verify_seal(bag, seal_path) == 0
+    assert verify_seal(bag, seal_path, allow_unpinned=True) == 0
 
 
 def test_verify_bag_tampered(tmp_path: Path) -> None:
@@ -112,5 +112,5 @@ def test_bag_and_mcap_share_pipeline(tmp_path: Path) -> None:
         app, ["seal", str(bag), "--new-key", new_key, "--no-anchor", "--out", str(seal_path)]
     )
     assert r_seal.exit_code == 0
-    r_verify = runner.invoke(app, ["verify", str(bag), str(seal_path)])
+    r_verify = runner.invoke(app, ["verify", str(bag), str(seal_path), "--allow-unpinned"])
     assert r_verify.exit_code == 0

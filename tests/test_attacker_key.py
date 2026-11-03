@@ -70,9 +70,11 @@ def test_reseal_with_attacker_key(tmp_path: Path) -> None:
     attacker_key = json.loads(attacker_seal.read_bytes())["signature"]["public_key"]
     assert real_key != attacker_key
 
-    # 3. Without pinning, the attacker's self-consistent seal verifies INTACT.
-    #    This documents the limitation the pitch is honest about.
-    assert verify_seal(tampered, attacker_seal) == 0
+    # 3. Without pinning, the attacker's self-consistent seal verifies INTACT. This
+    #    documents the limitation, which is why an unpinned INTACT exits 3, not 0,
+    #    unless the caller explicitly accepts the embedded key.
+    assert verify_seal(tampered, attacker_seal) == 3
+    assert verify_seal(tampered, attacker_seal, allow_unpinned=True) == 0
 
     # 4. Pinning the ORIGINAL signer's key catches it: the manifest was signed by
     #    a different (attacker) key -> exit 1.

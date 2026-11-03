@@ -60,7 +60,7 @@ def sealed_pair(tmp_path: Path) -> tuple[Path, Path]:
 
 def test_intact_returns_0(sealed_pair: tuple[Path, Path]) -> None:
     mcap, seal_path = sealed_pair
-    assert verify_seal(mcap, seal_path) == 0
+    assert verify_seal(mcap, seal_path, allow_unpinned=True) == 0
 
 
 def test_intact_message_count(sealed_pair: tuple[Path, Path]) -> None:

@@ -88,7 +88,8 @@ time = datetime(2026, 7, 20, 12, 0, 0, tzinfo=UTC)
 ## Checking your implementation
 
 ```bash
-veriseal verify conformance/sample_ros1.mcap          conformance/sample_ros1.seal.json      # INTACT
+veriseal verify conformance/sample_ros1.mcap          conformance/sample_ros1.seal.json \
+    --allow-unpinned                                                                         # INTACT
 veriseal verify conformance/sample_ros1.tampered.mcap conformance/sample_ros1.seal.json      # TAMPERED
 veriseal verify conformance/sample.bag conformance/sample.bag.seal.json \
     --pubkey conformance/sample.bag.pub.pem                                                  # INTACT, pinned

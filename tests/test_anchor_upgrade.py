@@ -151,7 +151,7 @@ def test_upgrade_confirmed_preserves_signature(
     anchored_seal.write_bytes(canonical_json(manifest))
 
     # Still INTACT after the anchor was upgraded to confirmed.
-    assert verify_seal(mcap_path, anchored_seal) == 0
+    assert verify_seal(mcap_path, anchored_seal, allow_unpinned=True) == 0
 
 
 def test_upgrade_confirmed_is_idempotent(

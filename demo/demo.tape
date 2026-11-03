@@ -16,7 +16,7 @@ Enter
 Sleep 2s
 
 # 1. Create a demo signer key, then seal (no anchor for deterministic demo)
-Type "veriseal keygen --out demo/demo.key.pem --force"
+Type "veriseal keygen --out demo/demo.key.pem --pub demo/demo.pub.pem --force"
 Enter
 Sleep 2s
 
@@ -25,7 +25,7 @@ Enter
 Sleep 3s
 
 # 2. Verify intact
-Type "veriseal verify demo/sample.mcap demo/sample.seal.json"
+Type "veriseal verify demo/sample.mcap demo/sample.seal.json --pubkey demo/demo.pub.pem"
 Enter
 Sleep 2s
 
@@ -35,7 +35,7 @@ Enter
 Sleep 1s
 
 # 4. Verify tampered
-Type "veriseal verify demo/tampered.mcap demo/sample.seal.json"
+Type "veriseal verify demo/tampered.mcap demo/sample.seal.json --pubkey demo/demo.pub.pem"
 Enter
 Sleep 2s
 

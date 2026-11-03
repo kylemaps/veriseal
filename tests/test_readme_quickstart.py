@@ -95,7 +95,12 @@ def test_readme_quickstart_runs_as_documented(tmp_path: Path, monkeypatch: pytes
         if args[0] == "seal" and "--no-anchor" not in args:
             args.append("--no-anchor")  # tests never contact public OpenTimestamps calendars
         result = runner.invoke(app, args)
-        expected_exit = 1 if any(line.startswith("TAMPERED") for line in documented) else 0
+        if any(line.startswith("TAMPERED") for line in documented):
+            expected_exit = 1
+        elif any(line.startswith("INTACT (signer not pinned)") for line in documented):
+            expected_exit = 3
+        else:
+            expected_exit = 0
         assert result.exit_code == expected_exit, (
             f"`{command}` -> {result.exit_code}\n{result.output}"
         )

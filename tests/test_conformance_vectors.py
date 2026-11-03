@@ -39,7 +39,14 @@ TAMPERED_LOG_TIME = 1_700_000_000_200_000_000
 
 
 def test_mcap_vector_is_intact() -> None:
-    assert verify_seal(CONFORMANCE / "sample_ros1.mcap", CONFORMANCE / "sample_ros1.seal.json") == 0
+    assert (
+        verify_seal(
+            CONFORMANCE / "sample_ros1.mcap",
+            CONFORMANCE / "sample_ros1.seal.json",
+            allow_unpinned=True,
+        )
+        == 0
+    )
 
 
 def test_mcap_vector_matches_documented_digest_and_root() -> None:
