@@ -27,7 +27,12 @@ from importlib.resources import files as _resource_files
 from pathlib import Path
 
 from veriseal.canonical import canonical_json
-from veriseal.verify import VerificationResult, run_verification
+from veriseal.verify import (
+    VerificationResult,
+    block_time_utc,
+    run_verification,
+    source_names,
+)
 
 # Repo-relative copy: used from a source checkout or an editable install, where
 # the packaged asset below does not physically exist.
@@ -99,12 +104,36 @@ def _anchor_report_lines(result: VerificationResult) -> list[str]:
     elif a.commits_ok is False:
         lines.append("  Anchor proof INVALID: does not commit to this manifest.")
         lines.append("  Do not treat the sealed time as proven; treat it as asserted only.")
+    elif a.status == "confirmed" and a.bitcoin_verified:
+        btc = a.bitcoin
+        lines.append(f"  Status: VERIFIED AGAINST BITCOIN, block #{btc.height}")
+        lines.append(f"  Block hash: {btc.block_hash}")
+        lines.append(f"  Block time: {block_time_utc(btc.block_time)}")
+        lines.append("  The header of this block, fetched when this report was generated from")
+        lines.append(f"  {source_names(btc.sources)} (all had to agree), contains the")
+        lines.append("  Merkle root this proof computes. So the sealed manifest existed no later")
+        lines.append("  than this block. The block time is set by the miner; Bitcoin's rules keep")
+        lines.append("  it within about two hours of real time. Anyone can repeat this check with")
+        lines.append("  anchor.ots and their own copy of the Bitcoin block chain.")
+    elif a.status == "confirmed" and a.bitcoin is not None and a.bitcoin.status == "false":
+        btc = a.bitcoin
+        lines.append(f"  Status: FALSE ATTESTATION, Bitcoin block #{btc.height}")
+        lines.append("  The proof names this block, but the block's header (fetched when this")
+        lines.append(f"  report was generated from {source_names(btc.sources)})")
+        lines.append("  does not contain the Merkle root the proof computes. The anchor was forged")
+        lines.append("  or corrupted. Treat the sealed time as asserted only.")
     elif a.status == "confirmed":
         lines.append(f"  Status: CALENDAR-ATTESTED, Bitcoin block #{a.block_height}")
-        lines.append("  NOT CHECKED AGAINST BITCOIN. An OpenTimestamps calendar supplied an")
-        lines.append("  attestation that this block commits to the sealed manifest, but veriseal")
-        lines.append("  has not compared it with the block itself. Until someone does (e.g. with")
-        lines.append("  the OpenTimestamps client and a Bitcoin node, using anchor.ots), treat the")
+        if a.bitcoin is None:
+            lines.append("  NOT CHECKED AGAINST BITCOIN. An OpenTimestamps calendar supplied an")
+            lines.append("  attestation that this block commits to the sealed manifest, but this")
+            lines.append("  report was built without comparing it with the block itself.")
+        else:
+            lines.append("  NOT CHECKED AGAINST BITCOIN. veriseal tried to compare the proof with")
+            lines.append("  the block itself, but the check could not complete:")
+            lines.append(f"  {a.bitcoin.detail}")
+        lines.append("  Until someone does (`veriseal verify --check-bitcoin`, or the")
+        lines.append("  OpenTimestamps client and a Bitcoin node, using anchor.ots), treat the")
         lines.append("  sealed time as claimed, not proven.")
     else:
         lines.append("  Status: PENDING attestation (no Bitcoin attestation yet)")
@@ -320,6 +349,7 @@ def build_pack(
     out: Path,
     pubkey_path: Path | None = None,
     as_zip: bool = False,
+    check_bitcoin: bool = False,
 ) -> PackResult:
     """Build an incident-evidence bundle from a sealed MCAP.
 
@@ -329,10 +359,12 @@ def build_pack(
     digest and expects it to travel alongside the bundle.
 
     With *as_zip*, writes a single ``.zip`` (``out`` gets a ``.zip`` suffix if it
-    lacks one); otherwise writes the bundle as a directory at *out*.
+    lacks one); otherwise writes the bundle as a directory at *out*. With
+    *check_bitcoin*, the report records whether the anchor checks out against
+    Bitcoin (network).
     """
     manifest = json.loads(seal_path.read_bytes())
-    result = run_verification(mcap_path, manifest, pubkey_path)
+    result = run_verification(mcap_path, manifest, pubkey_path, check_bitcoin=check_bitcoin)
     generated_at = datetime.now(UTC)
 
     if as_zip:

@@ -183,7 +183,15 @@ When `--anchor` is used (the default), `"anchor"` is replaced with:
 
 When `status` is `"pending"`, the `bitcoin_block_height` key is absent. `veriseal anchor upgrade` asks the OpenTimestamps calendars whether the proof has been included in a Bitcoin block; if so, it rewrites `ots_base64` with the upgraded proof, sets `status` to `"confirmed"`, and records `bitcoin_block_height`. It sets `"confirmed"` only when the upgraded proof actually carries a `BitcoinBlockHeaderAttestation`.
 
-**`"confirmed"` is a claim, not evidence.** It records that a calendar supplied a Bitcoin block-header attestation; the `status` and `bitcoin_block_height` fields are unsigned and anyone can edit them. Before treating the sealed time as established, a verifier MUST check the proof itself against the header of the attested Bitcoin block (the proof's result must equal that header's Merkle root), using block data it does not obtain from the seal's holder. A `pending` or unchecked anchor MUST NOT be presented as a verified timestamp. The reference CLI does not perform this check yet: it reports such anchors as "calendar-attested, not checked against Bitcoin", and `--require-anchor` fails for them.
+**`"confirmed"` is a claim, not evidence.** It records that a calendar supplied a Bitcoin block-header attestation; the `status` and `bitcoin_block_height` fields are unsigned and anyone can edit them. Before treating the sealed time as established, a verifier MUST check the proof itself against the header of the attested Bitcoin block (the proof's result must equal that header's Merkle root), using block data it does not obtain from the seal's holder. A `pending` or unchecked anchor MUST NOT be presented as a verified timestamp.
+
+The reference CLI performs this check with `veriseal verify --check-bitcoin` (implied by `--require-anchor`). For each `BitcoinBlockHeaderAttestation` in the proof, with message `msg` (the result of the proof's operations at that node) and block height `h`:
+
+1. Ask each of two independent block sources (Esplora API: `GET /block-height/{h}`, then `GET /block/{hash}/header`) for the block at `h`. Each must answer; the hash must be 64 lower-case hex characters; the header must be 80 bytes and its double SHA-256, byte-reversed, must equal that hash; and all sources must return the same header. Otherwise the result is *unchecked*.
+2. The attestation is *verified* if `msg` equals bytes 36–68 of the header (its Merkle root field, in serialized byte order), and *false* otherwise.
+3. The anchor's result is the lowest verified height if any; else *false* if any attestation was false; else *unchecked*. The header's time field (bytes 68–72, little-endian Unix seconds) is reported as the block time.
+
+Without the check, the CLI reports a Bitcoin attestation as "calendar-attested, not checked against Bitcoin". `--require-anchor` passes only for *verified*.
 
 **Excluded from signed payload.** The `"anchor"` key is removed before computing the Ed25519 signed payload (§4), so the anchor can be updated (e.g., upgraded from `pending` to `confirmed`) without invalidating the signature.
 
@@ -203,7 +211,7 @@ A verifier without the `veriseal` library can verify a sealed manifest as follow
 6. **Merkle check:** recomputed root must equal `merkle.root`.
 7. **Signature check:** build `manifest_without_signature_and_anchor` (remove `"signature"` and `"anchor"` keys), serialize as canonical JSON (§1), verify the Ed25519 signature `signature.value` using `signature.public_key` over that payload.
 8. **Tamper localisation:** diff the recomputed leaf multiset against the manifest `leaves` array to identify modified/added/removed messages.
-9. **Anchor (informational):** recompute `SHA-256(canonical_json(manifest WITHOUT "anchor"))` and compare against `anchor.commits`. Decode `anchor.ots_base64` as a `DetachedTimestampFile` and verify the OTS proof per the [OpenTimestamps specification](https://opentimestamps.org), including checking its Bitcoin attestation against the block header (§6); without that check, report the anchor as unverified.
+9. **Anchor (informational):** recompute `SHA-256(canonical_json(manifest WITHOUT "anchor"))` and compare against `anchor.commits`. Decode `anchor.ots_base64` as a `DetachedTimestampFile` and verify the OTS proof per the [OpenTimestamps specification](https://opentimestamps.org), including checking its Bitcoin attestation against the block header (§6, as `--check-bitcoin` does); without that check, report the anchor as unverified.
 
 ### 7.1 Overall verdict (normative)
 

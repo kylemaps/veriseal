@@ -4,8 +4,8 @@ A doctored anchor whose `commits` field is edited to match the manifest but whos
 `ots_base64` proof actually binds a DIFFERENT digest must be rejected under
 --require-anchor. The commits string alone is attacker-controlled text; the proof
 bytes are what bind a digest, and verify_anchor cross-checks them. A proof that binds
-the right digest to a made-up Bitcoin attestation must not pass either: without a check
-against the Bitcoin block header it is only a claim.
+the right digest to a made-up Bitcoin attestation must not pass either: the block it
+names does not contain it, and until that is checked it is only a claim.
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+from functools import partial
 from pathlib import Path
 
 import pytest
@@ -22,6 +23,7 @@ from opentimestamps.core.op import OpSHA256
 from opentimestamps.core.serialize import BytesSerializationContext
 from opentimestamps.core.timestamp import DetachedTimestampFile, Timestamp
 
+import veriseal.anchor as anchor_mod
 from veriseal.canonical import canonical_json
 from veriseal.seal import seal
 from veriseal.verify import verify_seal
@@ -116,9 +118,25 @@ def _seal_with_made_up_attestation(tmp_path: Path) -> tuple[Path, Path]:
     return mcap, made_up_seal
 
 
-def test_unchecked_bitcoin_attestation_fails_require_anchor(tmp_path: Path) -> None:
-    """Nothing here checks the attestation against Bitcoin, so it must not satisfy the flag."""
+def test_made_up_bitcoin_attestation_fails_require_anchor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The real block #820001 does not contain the proof, so the flag must not be met."""
     mcap, made_up_seal = _seal_with_made_up_attestation(tmp_path)
+    real_header = bytes(36) + hashlib.sha256(b"block 820001's transactions").digest() + bytes(12)
+    real_hash = anchor_mod.block_hash(real_header)
+    served = {
+        "/block-height/820001": real_hash,
+        f"/block/{real_hash}/header": real_header.hex(),
+    }
+    sources = ("https://one.example/api", "https://two.example/api")
+
+    def get(url: str) -> str:
+        return served[url.split("/api", 1)[1]]
+
+    monkeypatch.setattr(
+        anchor_mod, "check_bitcoin", partial(anchor_mod.check_bitcoin, sources=sources, get=get)
+    )
     assert verify_seal(mcap, made_up_seal, require_anchor=True) == 1
 
 
@@ -128,7 +146,7 @@ def test_unchecked_attestation_is_reported_as_calendar_attested(
     mcap, made_up_seal = _seal_with_made_up_attestation(tmp_path)
     assert verify_seal(mcap, made_up_seal) == 0  # anchors stay informational by default
     out = " ".join(capsys.readouterr().out.split())
-    assert "Anchor: calendar-attested, Bitcoin block #820001 (not checked against Bitcoin)" in out
+    assert "Anchor: calendar-attested, Bitcoin block #820001 (not checked against Bitcoin" in out
     assert "confirmed" not in out.lower()
 
 

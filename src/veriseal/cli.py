@@ -110,13 +110,21 @@ def verify(
             "Without this flag, the key embedded in the manifest is trusted unconditionally."
         ),
     ),
+    check_bitcoin: bool = typer.Option(
+        False,
+        "--check-bitcoin",
+        help=(
+            "Check the anchor against the Bitcoin block it names, using block headers from "
+            "mempool.space and blockstream.info (needs network). Reports the result; "
+            "use --require-anchor to fail on it."
+        ),
+    ),
     require_anchor: bool = typer.Option(
         False,
         "--require-anchor",
         help=(
-            "FAIL unless the anchor commits to this manifest AND has been checked against "
-            "Bitcoin. This version cannot check against Bitcoin yet, so pending and "
-            "calendar-attested anchors both fail."
+            "FAIL unless the anchor commits to this manifest AND checks out against a real "
+            "Bitcoin block. Implies --check-bitcoin."
         ),
     ),
 ) -> None:
@@ -124,7 +132,13 @@ def verify(
     from veriseal.verify import verify_seal
 
     raise typer.Exit(
-        code=verify_seal(path, seal_json, pubkey_path=pubkey, require_anchor=require_anchor)
+        code=verify_seal(
+            path,
+            seal_json,
+            pubkey_path=pubkey,
+            require_anchor=require_anchor,
+            check_bitcoin=check_bitcoin,
+        )
     )
 
 
@@ -148,11 +162,18 @@ def pack(
         "--pubkey",
         help="Pin the expected signer's Ed25519 public key (PEM) when building the report.",
     ),
+    check_bitcoin: bool = typer.Option(
+        False,
+        "--check-bitcoin",
+        help="Check the anchor against Bitcoin (needs network) and record the result.",
+    ),
 ) -> None:
     """Build a portable, independently re-verifiable incident-evidence bundle."""
     from veriseal.pack import build_pack
 
-    result = build_pack(path, seal_json, out, pubkey_path=pubkey, as_zip=zip_)
+    result = build_pack(
+        path, seal_json, out, pubkey_path=pubkey, as_zip=zip_, check_bitcoin=check_bitcoin
+    )
     if result.ok:
         console.print(f"[bold green]Pack written[/bold green]: {result.out}  (INTACT)")
     else:

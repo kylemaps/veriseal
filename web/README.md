@@ -49,7 +49,8 @@ If the manifest format or hashing changes in the Python code, update `verify.htm
   needs an MCAP parser + decompressor, which this dependency-free single file doesn't carry; the
   digest check is the honest, format-agnostic neutrality proof.
 - **Anchor status is informational here.** The page shows whether an OpenTimestamps proof is
-  embedded but does not check it against Bitcoin. Neither does the CLI yet; the OpenTimestamps
-  client with a Bitcoin node can.
+  embedded but does not check it against Bitcoin, because that needs block data from the
+  network. `veriseal verify --check-bitcoin` does, as does the OpenTimestamps client with a
+  Bitcoin node.
 - Pinning only helps if the key you paste really is the signer's: get it from the signer through
   a channel the log's holder doesn't control.

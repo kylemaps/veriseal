@@ -14,7 +14,9 @@ import hashlib
 import json
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from cryptography.hazmat.primitives.serialization import (
     Encoding,
@@ -28,6 +30,9 @@ from veriseal.formats import iter_messages
 from veriseal.mcap_io import file_digest
 from veriseal.merkle import leaf_hash, merkle_root
 from veriseal.signing import verify as ed25519_verify
+
+if TYPE_CHECKING:
+    from veriseal.anchor import BitcoinCheck
 
 console = Console()
 
@@ -51,6 +56,22 @@ class AnchorResult:
     status: str | None = None  # "pending" | "confirmed" (calendar-attested, not checked)
     block_height: int | None = None
     error: str | None = None
+    bitcoin: BitcoinCheck | None = None  # set only when asked to check against Bitcoin
+
+    @property
+    def bitcoin_verified(self) -> bool:
+        """The proof commits to this manifest and was checked against a real block."""
+        return (
+            self.error is None
+            and self.commits_ok is True
+            and self.bitcoin is not None
+            and self.bitcoin.status == "verified"
+        )
+
+
+def block_time_utc(seconds: int) -> str:
+    """A block header's timestamp as UTC text, e.g. ``2026-08-17 06:45 UTC``."""
+    return datetime.fromtimestamp(seconds, UTC).strftime("%Y-%m-%d %H:%M UTC")
 
 
 @dataclass
@@ -98,8 +119,12 @@ def run_verification(
     mcap_path: Path,
     manifest: dict,
     pubkey_path: Path | None = None,
+    check_bitcoin: bool = False,
 ) -> VerificationResult:
     """Recompute and check *manifest* against *mcap_path*. Pure — no console output.
+
+    With *check_bitcoin*, a Bitcoin attestation in the anchor is also checked against
+    real block headers, which needs the network; otherwise nothing here goes online.
 
     Raises on I/O or parse errors (unreadable MCAP, unreadable --pubkey file);
     callers decide how to present those as CLI errors vs. pack failures.
@@ -188,6 +213,8 @@ def run_verification(
                 status, block_height = anchor_mod.verify_anchor(expected_digest, ots_bytes)
                 anchor_result.status = status
                 anchor_result.block_height = block_height
+                if check_bitcoin and status == "confirmed":
+                    anchor_result.bitcoin = anchor_mod.check_bitcoin(expected_digest, ots_bytes)
         except Exception as exc:
             anchor_result.error = str(exc)
 
@@ -214,15 +241,20 @@ def verify_seal(
     seal_path: Path,
     pubkey_path: Path | None = None,
     require_anchor: bool = False,
+    check_bitcoin: bool = False,
 ) -> int:
     """
     Verify *mcap_path* against *seal_path* and print a Rich report.
+
+    *check_bitcoin* checks the anchor against real Bitcoin block headers (network) and
+    reports the result; *require_anchor* implies it and fails unless it succeeds.
 
     Returns:
         0  — INTACT (signature valid AND Merkle root matches AND pubkey/anchor checks pass)
         1  — TAMPERED, key mismatch, or --require-anchor not met
         2  — usage / parse error
     """
+    check_bitcoin = check_bitcoin or require_anchor
     try:
         manifest = json.loads(seal_path.read_bytes())
     except Exception as exc:
@@ -230,7 +262,7 @@ def verify_seal(
         return 2
 
     try:
-        result = run_verification(mcap_path, manifest, pubkey_path)
+        result = run_verification(mcap_path, manifest, pubkey_path, check_bitcoin=check_bitcoin)
     except FileNotFoundError as exc:
         console.print(f"[bold red]ERROR:[/bold red] Cannot read MCAP: {exc}")
         return 2
@@ -304,31 +336,52 @@ def verify_seal(
         anchor_fail = True
     elif result.anchor.present:
         a = result.anchor
-        proof_ok = a.error is None and a.commits_ok is not False
+        btc = a.bitcoin
         if a.error is not None:
             console.print(f"  [bold red]Anchor: ERROR[/bold red]: {a.error}")
         elif a.commits_ok is False:
             console.print(
                 "  [bold red]Anchor: INVALID[/bold red] (proof does not commit to this manifest)"
             )
-        elif a.status == "confirmed":
-            console.print(
-                f"  [yellow]Anchor: calendar-attested[/yellow], Bitcoin block #{a.block_height} "
-                "(not checked against Bitcoin)"
-            )
-        else:
+        elif a.status == "pending":
             console.print(
                 "  [cyan]Anchor: pending[/cyan] (no Bitcoin attestation yet; "
                 "run `veriseal anchor upgrade` later)"
             )
-        if require_anchor:
+        elif btc is not None and btc.status == "verified":
+            console.print(
+                f"  [bold green]Anchor: verified against Bitcoin[/bold green], "
+                f"block #{btc.height} ({block_time_utc(btc.block_time)})\n"
+                "    The manifest existed no later than this block. "
+                f"Header from {source_names(btc.sources)}:\n"
+                f"    block hash {btc.block_hash}"
+            )
+        elif btc is not None and btc.status == "false":
+            console.print(
+                f"  [bold red]Anchor: FALSE[/bold red]: Bitcoin block #{btc.height} does not "
+                "contain this proof (forged or corrupted attestation)"
+            )
+        elif btc is not None:
+            console.print(
+                f"  [yellow]Anchor: calendar-attested[/yellow], Bitcoin block #{a.block_height} "
+                f"(could not check against Bitcoin: {btc.detail})"
+            )
+        else:
+            console.print(
+                f"  [yellow]Anchor: calendar-attested[/yellow], Bitcoin block #{a.block_height} "
+                "(not checked against Bitcoin; add --check-bitcoin)"
+            )
+        if require_anchor and not a.bitcoin_verified:
             anchor_fail = True
-            if proof_ok:
-                # Nothing here fetches a Bitcoin block header, so no anchor can be
-                # verified, and an unverified attestation must never satisfy this flag.
-                console.print(
-                    "  [bold red]--require-anchor not met[/bold red]: the anchor must be checked "
-                    "against Bitcoin, which this version of veriseal cannot do yet"
-                )
+            console.print(
+                "  [bold red]--require-anchor not met[/bold red]: the anchor must commit to this "
+                "manifest and be verified against a Bitcoin block"
+            )
 
     return 0 if (result.ok and not anchor_fail) else 1
+
+
+def source_names(sources: tuple[str, ...]) -> str:
+    """Block sources by host name: ``"mempool.space and blockstream.info"``."""
+    names = [s.split("//", 1)[-1].split("/", 1)[0] for s in sources]
+    return " and ".join(names)
