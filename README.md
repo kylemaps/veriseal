@@ -175,6 +175,8 @@ veriseal verify log.mcap log.seal.json --pubkey signer.pub.pem --require-anchor
 
 Add one step to your ROS 2 recording workflow so every log is sealed the moment it finishes: generate a signer key once with `veriseal keygen`, then run `veriseal seal` on the recorder's exit (a post-record one-liner, or an `OnProcessExit` handler in a launch file). Copy-paste snippets: [docs/auto-seal.md](https://github.com/kylemaps/veriseal/blob/main/docs/auto-seal.md).
 
+To see what sealing costs on the robot's own computer (time, memory, and energy where it has a power sensor), run [`bench/measure.py`](https://github.com/kylemaps/veriseal/blob/main/bench/README.md) on a few of its recordings.
+
 ### ROS 1 rosbags and other formats
 
 veriseal hashes `(topic, log_time, payload)` message triples, which aren't MCAP-specific. It seals **MCAP** natively and **ROS 1 `.bag`** directly via the optional `rosbags` reader (pure Python, no ROS install): `pip install "veriseal[ros1]"`, then `veriseal seal drive.bag ...`. `seal`, `verify`, and `pack` work the same across formats (the manifest records `source.format`); `inspect`'s window export is MCAP-only. See [docs/ros1.md](https://github.com/kylemaps/veriseal/blob/main/docs/ros1.md).

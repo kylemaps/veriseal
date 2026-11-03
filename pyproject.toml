@@ -63,6 +63,8 @@ only-include = [
     "conformance",
     # tests/test_readme_quickstart.py builds the README's sample log with it.
     "demo/make_sample.py",
+    # The on-robot cost measurement (tests/test_bench_measure.py imports it).
+    "bench",
     "docs",
     "README.md",
     "SPEC-manifest.md",
