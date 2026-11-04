@@ -39,6 +39,9 @@ python bench/measure.py /path/to/log.mcap /path/to/other.bag --runs 5 --battery-
 - Give `.mcap` files, ROS 1 `.bag` files, or ROS 2 bag folders recorded with `--storage mcap`.
 - `--battery-wh` is the robot's battery capacity; with it, the results also give sealing's share
   of the battery per hour of recording.
+- On an Intel computer such as a NUC, the energy counter is readable only by root. Run the
+  script with the environment's own Python, `sudo .venv/bin/python bench/measure.py ...`,
+  because a plain `sudo python` skips the environment.
 - Leave the robot otherwise idle while it runs: the first 10 seconds measure idle power.
 - On a Jetson, note the power mode (`sudo nvpmodel -q`); the script records it when it can.
 
