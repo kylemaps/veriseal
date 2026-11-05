@@ -1,4 +1,4 @@
-"""Hermetic tests for veriseal pack (no network — --no-anchor throughout)."""
+"""Hermetic tests for veriseal pack (no network: --no-anchor throughout)."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from mcap.writer import Writer
 from veriseal.pack import build_pack
 from veriseal.seal import seal
 
-# ── helpers ──────────────────────────────────────────────────────────────────
+# helpers
 
 
 def _write_mcap(path: Path, messages: list[tuple[str, int, bytes]]) -> Path:
@@ -50,7 +50,7 @@ def sealed_pair(tmp_path: Path) -> tuple[Path, Path]:
     return mcap, seal_path
 
 
-# ── contents ─────────────────────────────────────────────────────────────────
+# contents
 
 
 def test_pack_ok_on_intact_log(sealed_pair: tuple[Path, Path], tmp_path: Path) -> None:
@@ -107,7 +107,7 @@ def test_pack_manifest_is_verbatim(sealed_pair: tuple[Path, Path], tmp_path: Pat
     assert original == bundled
 
 
-# ── report content matches the verification result ───────────────────────────
+# report content matches the verification result
 
 
 def test_report_reflects_signature_and_root(sealed_pair: tuple[Path, Path], tmp_path: Path) -> None:
@@ -173,7 +173,7 @@ def test_report_on_tampered_log_says_tampered(
     assert "/pose" in report
 
 
-# ── determinism ──────────────────────────────────────────────────────────────
+# determinism
 
 
 def test_pack_is_byte_deterministic_except_generated_line(
@@ -220,7 +220,7 @@ def test_report_generated_line_excluded_from_signed_content(
     assert b"Report generated" not in manifest_bytes
 
 
-# ── zip output ───────────────────────────────────────────────────────────────
+# zip output
 
 
 def test_pack_zip_creates_archive(sealed_pair: tuple[Path, Path], tmp_path: Path) -> None:
@@ -269,7 +269,7 @@ def test_cli_pack_zip_flag(sealed_pair: tuple[Path, Path], tmp_path: Path) -> No
     assert (tmp_path / "bundle.zip").is_file()
 
 
-# ── exit code plumbing (CLI) ───────────────────────────────────────────────
+# exit code plumbing (CLI)
 
 
 def test_cli_pack_exit_code_ok(sealed_pair: tuple[Path, Path], tmp_path: Path) -> None:

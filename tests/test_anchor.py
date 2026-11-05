@@ -19,7 +19,7 @@ from veriseal.canonical import canonical_json
 from veriseal.seal import seal
 from veriseal.verify import verify_seal
 
-# ── helpers ──────────────────────────────────────────────────────────────────
+# helpers
 
 
 def _fake_ots(digest: bytes) -> bytes:
@@ -62,7 +62,7 @@ def mcap_path(tmp_path: Path) -> Path:
     return _write_mcap(tmp_path / "test.mcap", _MESSAGES)
 
 
-# ── anchor.submit monkeypatch ─────────────────────────────────────────────────
+# anchor.submit monkeypatch
 
 
 @pytest.fixture
@@ -73,7 +73,7 @@ def patched_submit(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(anchor_mod, "submit", _fake_ots)
 
 
-# ── seal --anchor writes correct anchor block ─────────────────────────────────
+# seal --anchor writes correct anchor block
 
 
 def test_anchor_block_written(mcap_path: Path, tmp_path: Path, patched_submit: None) -> None:
@@ -150,7 +150,7 @@ def test_anchor_commits_to_signature(mcap_path: Path, tmp_path: Path, patched_su
     assert "signature" in {k: v for k, v in manifest.items() if k != "anchor"}
 
 
-# ── --no-anchor leaves anchor null ───────────────────────────────────────────
+# --no-anchor leaves anchor null
 
 
 def test_no_anchor_leaves_null(mcap_path: Path, tmp_path: Path) -> None:
@@ -178,7 +178,7 @@ def test_no_anchor_signature_still_valid(mcap_path: Path, tmp_path: Path) -> Non
     assert verify_seal(mcap_path, seal_path, allow_unpinned=True) == 0
 
 
-# ── verify_anchor directly ───────────────────────────────────────────────────
+# verify_anchor directly
 
 
 def test_verify_anchor_pending() -> None:
@@ -199,7 +199,7 @@ def test_verify_anchor_wrong_digest_raises() -> None:
         verify_anchor(digest_b, ots_bytes)
 
 
-# ── anchor tamper detection via verify_seal ───────────────────────────────────
+# anchor tamper detection via verify_seal
 
 
 def test_tampered_manifest_anchor_invalid(
@@ -243,17 +243,17 @@ def test_anchor_commits_mismatch_detected(
     patched_seal = tmp_path / "patched.seal.json"
     patched_seal.write_bytes(canonical_json(manifest))
 
-    # Anchor is EXCLUDED from the signed payload, so sig + Merkle still pass → INTACT.
+    # Anchor is excluded from the signed payload, so sig + Merkle still pass → INTACT.
     # The anchor INVALID message is printed as informational output only.
     result = verify_seal(mcap_path, patched_seal, allow_unpinned=True)
     assert result == 0  # INTACT: anchor is informational, not part of the exit code
 
 
-# ── prior tests unaffected with --no-anchor ───────────────────────────────────
+# --no-anchor
 
 
 def test_prior_verify_intact_with_no_anchor(mcap_path: Path, tmp_path: Path) -> None:
-    """Full seal/verify cycle with no anchor returns 0 (prior behaviour preserved)."""
+    """Full seal/verify cycle with no anchor returns 0."""
     seal_path = tmp_path / "out.seal.json"
     seal(
         mcap_path,
@@ -283,7 +283,7 @@ def test_prior_verify_tampered_with_no_anchor(mcap_path: Path, tmp_path: Path) -
     assert verify_seal(tampered_mcap, seal_path) == 1
 
 
-# ── seal summary always states the anchor ────────────────────────────────────
+# seal summary always states the anchor
 
 
 def _summary(capsys: pytest.CaptureFixture[str]) -> str:

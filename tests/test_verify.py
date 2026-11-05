@@ -11,7 +11,7 @@ from mcap.writer import Writer
 from veriseal.seal import seal
 from veriseal.verify import verify_seal
 
-# ── helpers ──────────────────────────────────────────────────────────────────
+# helpers
 
 
 def _write_mcap(path: Path, messages: list[tuple[str, int, bytes]]) -> Path:
@@ -55,7 +55,7 @@ def sealed_pair(tmp_path: Path) -> tuple[Path, Path]:
     return mcap, seal_path
 
 
-# ── INTACT ────────────────────────────────────────────────────────────────────
+# INTACT
 
 
 def test_intact_returns_0(sealed_pair: tuple[Path, Path]) -> None:
@@ -69,7 +69,7 @@ def test_intact_message_count(sealed_pair: tuple[Path, Path]) -> None:
     assert manifest["messages"]["count"] == 5
 
 
-# ── TAMPERED: payload changed (MODIFIED) ─────────────────────────────────────
+# TAMPERED: payload changed (MODIFIED)
 
 
 def test_modified_payload_returns_1(sealed_pair: tuple[Path, Path], tmp_path: Path) -> None:
@@ -109,7 +109,7 @@ def test_modified_payload_locates_message(sealed_pair: tuple[Path, Path], tmp_pa
     assert leaves_by_key[("/pose", 3_000_000)] == original_lh
 
 
-# ── TAMPERED: message removed (REMOVED) ──────────────────────────────────────
+# TAMPERED: message removed (REMOVED)
 
 
 def test_removed_message_returns_1(sealed_pair: tuple[Path, Path], tmp_path: Path) -> None:
@@ -134,7 +134,7 @@ def test_removed_message_locates(sealed_pair: tuple[Path, Path], tmp_path: Path)
     assert ("/status", 4_000_000) in removed
 
 
-# ── TAMPERED: message added (ADDED) ──────────────────────────────────────────
+# TAMPERED: message added (ADDED)
 
 
 def test_added_message_returns_1(sealed_pair: tuple[Path, Path], tmp_path: Path) -> None:
@@ -157,7 +157,7 @@ def test_added_message_locates(sealed_pair: tuple[Path, Path], tmp_path: Path) -
     assert ("/pose", 6_000_000) in added
 
 
-# ── TAMPERED: manifest field corrupted → signature invalid ───────────────────
+# TAMPERED: manifest field corrupted → signature invalid
 
 
 def test_corrupted_manifest_field_returns_1(sealed_pair: tuple[Path, Path], tmp_path: Path) -> None:

@@ -2,7 +2,7 @@
 
 The browser verifier reimplements verification in JS. It reads specific fields
 and formats out of the .seal.json. If any of these change, web/verify.html must
-be updated to match — this test fails loudly when the contract drifts.
+be updated to match, and this test fails when that happens.
 """
 
 from __future__ import annotations

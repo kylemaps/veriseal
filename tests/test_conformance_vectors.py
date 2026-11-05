@@ -5,10 +5,9 @@ codebase. That promise only holds if the vectors and the results documented in
 `conformance/README.md` stay true, so CI checks them here rather than trusting the
 prose.
 
-These are also the only tests that verify against a COMMITTED log file. Every other
-test writes a fresh MCAP at run time, which means the file-digest check (SPEC 7
-step 2) and leaf re-derivation (step 3) were never exercised against a fixed,
-published artifact until now.
+These are also the only tests that verify against a committed log file. Every other
+test writes a fresh MCAP at run time, so only these exercise the file-digest check
+(SPEC 7 step 2) and leaf re-derivation (step 3) against a fixed, published file.
 """
 
 from __future__ import annotations
@@ -24,7 +23,7 @@ from veriseal.verify import run_verification, verify_seal
 
 CONFORMANCE = Path(__file__).resolve().parent.parent / "conformance"
 
-# Documented in conformance/README.md — changing either means the published vectors
+# Documented in conformance/README.md. Changing either means the published vectors
 # changed, which is a breaking change for anyone who implemented against them.
 MCAP_ROOT = "9a75174f04a956e947427887468f63381b3914cafbc3f83b052620a2bc04a581"
 MCAP_SHA256 = "f8e502bce22c7130ccd70aaadef1e651a72296b93a7be9ace6c665e9993d1651"
@@ -35,7 +34,7 @@ TAMPERED_TOPIC = "/status"
 TAMPERED_LOG_TIME = 1_700_000_000_200_000_000
 
 
-# ── MCAP vector ──────────────────────────────────────────────────────────────
+# MCAP vector
 
 
 def test_mcap_vector_is_intact() -> None:
@@ -77,7 +76,7 @@ def test_mcap_vector_is_the_cross_core_fixture() -> None:
 def test_mcap_vector_has_no_source_format_key() -> None:
     """Backward-compat vector: a v1 manifest predating `source.format` must verify.
 
-    Documented in conformance/README.md; a verifier that started REQUIRING
+    Documented in conformance/README.md; a verifier that started requiring
     source.format would break every manifest sealed before 2026-07-20.
     """
     manifest = json.loads((CONFORMANCE / "sample_ros1.seal.json").read_bytes())
@@ -85,7 +84,7 @@ def test_mcap_vector_has_no_source_format_key() -> None:
     assert manifest["anchor"] is None
 
 
-# ── tampered vector ──────────────────────────────────────────────────────────
+# tampered vector
 
 
 def test_tampered_vector_is_tampered() -> None:
@@ -108,7 +107,7 @@ def test_tampered_vector_fails_all_three_documented_checks() -> None:
 
 
 def test_tampered_vector_localises_the_changed_message() -> None:
-    """SPEC 7 step 8: naming WHICH message changed, not merely that one did."""
+    """SPEC 7 step 8: name which message changed."""
     manifest = json.loads((CONFORMANCE / "sample_ros1.seal.json").read_bytes())
     result = run_verification(CONFORMANCE / "sample_ros1.tampered.mcap", manifest)
 
@@ -117,7 +116,7 @@ def test_tampered_vector_localises_the_changed_message() -> None:
     assert result.additions == []
 
 
-# ── ROS 1 bag vector (needs the optional reader) ─────────────────────────────
+# ROS 1 bag vector (needs the optional reader)
 
 pytest.importorskip("rosbags", reason="ROS 1 vector needs veriseal[ros1]")
 
@@ -144,9 +143,9 @@ def test_bag_vector_records_rosbag1_format() -> None:
 def test_bag_vector_is_reproducible_from_the_published_seed() -> None:
     """Re-sealing with the documented seed and timestamp must be byte-identical.
 
-    This is what makes the vector a vector: anyone can regenerate it. If this
-    fails, either the seed/time in conformance/README.md is wrong or something
-    in the manifest construction stopped being deterministic.
+    Anyone must be able to regenerate this vector. If this fails, either the seed/time
+    in conformance/README.md is wrong or something in the manifest construction stopped
+    being deterministic.
     """
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 

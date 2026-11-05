@@ -374,7 +374,7 @@ function SealCheckPanel({ context }: { context: PanelExtensionContext }): ReactE
         </div>
       )}
 
-      {/* honesty note */}
+      {/* what the panel cannot check */}
       <div
         style={{
           marginTop: 16,

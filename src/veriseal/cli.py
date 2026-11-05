@@ -50,7 +50,7 @@ def seal(
     ),
     out: Path | None = typer.Option(None, "--out", help="Output path for the .seal.json manifest."),
     anchor: bool = typer.Option(
-        True, "--anchor/--no-anchor", help="Submit Merkle root to OpenTimestamps calendars."
+        True, "--anchor/--no-anchor", help="Submit the manifest digest to OpenTimestamps."
     ),
     key_passphrase_env: str | None = typer.Option(
         None,

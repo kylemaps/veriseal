@@ -28,6 +28,6 @@
 ### Fixed
 
 - A Bitcoin attestation that hasn't been checked against Bitcoin is reported as "calendar-attested, not checked against Bitcoin", never as confirmed, in `verify`, the pack report and the web verifier.
-- Documentation now states exactly what the Merkle root, the file hash and the pack cover.
+- Documentation now says what the Merkle root, the file hash and the pack each cover.
 - The test suite fails any test that opens a network connection.
 - Dependency caps raised to tested versions: cryptography <50, typer <0.27, rich <16.

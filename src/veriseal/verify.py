@@ -1,10 +1,10 @@
-"""veriseal verify — recompute and check a sealed MCAP.
+"""veriseal verify: recompute and check a sealed MCAP.
 
 The verification logic lives in `run_verification()`, which returns a structured
 `VerificationResult` with no I/O or presentation. `verify_seal()` (the CLI entry
-point) and `veriseal.pack` both call it, so there is exactly one verification
-code path — the CLI's Rich console output and the incident-pack report are two
-renderings of the same result, never two computations.
+point) and `veriseal.pack` both call it, so there is one verification code path:
+the CLI's Rich console output and the incident-pack report both render the same
+result.
 """
 
 from __future__ import annotations
@@ -100,7 +100,7 @@ class VerificationResult:
     @property
     def intact(self) -> bool:
         """Message-level integrity: the signed manifest is authentic and its
-        leaves fold to the signed root. This is NOT the full verdict — it says
+        leaves fold to the signed root. This is not the full verdict: it says
         nothing about whether the raw file on disk still matches (see `ok`)."""
         return self.sig_ok and self.root_ok
 
@@ -121,7 +121,7 @@ def run_verification(
     pubkey_path: Path | None = None,
     check_bitcoin: bool = False,
 ) -> VerificationResult:
-    """Recompute and check *manifest* against *mcap_path*. Pure — no console output.
+    """Recompute and check *manifest* against *mcap_path*. No console output.
 
     With *check_bitcoin*, a Bitcoin attestation in the anchor is also checked against
     real block headers, which needs the network; otherwise nothing here goes online.
@@ -135,7 +135,7 @@ def run_verification(
         and actual_size == manifest["source"]["size_bytes"]
     )
 
-    # ── Signature check ───────────────────────────────────────────────────────
+    # Signature check
     pub_pem_str = manifest["signature"]["public_key"]
     try:
         payload_dict = {k: v for k, v in manifest.items() if k not in ("signature", "anchor")}
@@ -145,7 +145,7 @@ def run_verification(
     except Exception:
         sig_ok = False
 
-    # ── Pubkey pin check ─────────────────────────────────────────────────────
+    # Pubkey pin check
     pubkey_pinned = pubkey_path is not None
     pubkey_ok = True
     if pubkey_path is not None:
@@ -155,7 +155,7 @@ def run_verification(
         raw_manifest = manifest_key.public_bytes(Encoding.Raw, PublicFormat.Raw)
         pubkey_ok = raw_expected == raw_manifest
 
-    # ── Recompute leaves from MCAP (hashed as read; payloads are not kept) ────
+    # Recompute leaves from MCAP (hashed as read; payloads are not kept)
     recomputed_entries = [
         (topic, log_time, leaf_hash(topic, log_time, payload).hex())
         for topic, log_time, payload in iter_messages(mcap_path)
@@ -164,16 +164,16 @@ def run_verification(
         (leaf["topic"], leaf["log_time"], leaf["leaf_hash"]) for leaf in manifest["leaves"]
     ]
 
-    # ── Recompute Merkle root (same sort as seal) ─────────────────────────────
+    # Recompute Merkle root (same sort as seal)
     # (log_time, topic, leaf_hash). Python sorts strings by Unicode code point;
     # the JS verifiers use `<` (UTF-16 code unit). Same as manifest.py: agrees on
-    # the BMP, can diverge for astral-plane topics — keep this in lockstep.
+    # the BMP, can diverge for astral-plane topics. Keep this in lockstep.
     sorted_recomputed = sorted(recomputed_entries, key=lambda x: (x[1], x[0], x[2]))
     recomputed_hashes = [bytes.fromhex(lh) for _, _, lh in sorted_recomputed]
     recomputed_root = merkle_root(recomputed_hashes).hex()
     root_ok = recomputed_root == manifest["merkle"]["root"]
 
-    # ── Tamper localisation via (topic, log_time) multisets ──────────────────
+    # Tamper localisation via (topic, log_time) multisets
     manifest_ms = _build_multiset(manifest_entries)
     recomputed_ms = _build_multiset(recomputed_entries)
 
@@ -193,7 +193,7 @@ def run_verification(
         else:
             additions.append(key)
 
-    # ── Anchor check (informational) ──────────────────────────────────────────
+    # Anchor check (informational)
     anchor_result = AnchorResult()
     anchor = manifest.get("anchor")
     if anchor and anchor.get("type") == "opentimestamps":
@@ -250,11 +250,11 @@ def verify_seal(
     reports the result; *require_anchor* implies it and fails unless it succeeds.
 
     Returns:
-        0  — INTACT, signed by the pinned key (or *allow_unpinned*), anchor checks pass
-        1  — TAMPERED, key mismatch, or --require-anchor not met
-        2  — usage / parse error
-        3  — INTACT, but no key was pinned: the embedded key was trusted, so a re-seal
-             by anyone else would pass too
+        0: INTACT, signed by the pinned key (or *allow_unpinned*), anchor checks pass
+        1: TAMPERED, key mismatch, or --require-anchor not met
+        2: usage or parse error
+        3: INTACT, but no key was pinned: the embedded key was trusted, so a re-seal
+           by anyone else would pass too
     """
     check_bitcoin = check_bitcoin or require_anchor
     try:
@@ -272,7 +272,7 @@ def verify_seal(
         console.print(f"[bold red]ERROR:[/bold red] {exc}")
         return 2
 
-    # ── Rich output ───────────────────────────────────────────────────────────
+    # Rich output
     n = manifest["messages"]["count"]
     root_hex = manifest["merkle"]["root"]
 
@@ -282,8 +282,7 @@ def verify_seal(
             f"[bold green]INTACT[/bold green]{pin_note}: signature valid, "
             f"{n} messages, root {root_hex[:16]}..."
         )
-        # Show the file-integrity check affirmatively too, so the source status
-        # is ALWAYS reported (not only on failure) and INTACT visibly means the
+        # Report the file-integrity check on success too, so INTACT visibly means the
         # bytes on disk match the sealed digest.
         console.print(
             f"  [green]Source file unchanged[/green] (SHA-256 {result.actual_sha256[:16]}...)"
@@ -320,7 +319,7 @@ def verify_seal(
             for topic, log_time in result.additions:
                 console.print(f"  [yellow]ADDED[/yellow]     topic={topic!r} log_time={log_time}")
 
-    # ── No-pubkey warning ─────────────────────────────────────────────────────
+    # No-pubkey warning
     if pubkey_path is None:
         console.print(
             "  [yellow]WARNING:[/yellow] no --pubkey: trusting the key embedded in the manifest; "
@@ -328,7 +327,7 @@ def verify_seal(
             "Pin the signer's key for real assurance."
         )
 
-    # ── Anchor report ─────────────────────────────────────────────────────────
+    # Anchor report
     anchor_fail = False
     anchor = manifest.get("anchor")
     if require_anchor and (anchor is None or anchor.get("type") not in ("opentimestamps",)):

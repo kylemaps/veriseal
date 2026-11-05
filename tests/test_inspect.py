@@ -9,7 +9,7 @@ from mcap.reader import make_reader
 
 from veriseal.inspect import inspect_mcap, parse_time
 
-# ── parse_time ────────────────────────────────────────────────────────────────
+# parse_time
 
 
 def test_parse_time_integer_ns():
@@ -53,7 +53,7 @@ def test_parse_time_no_timezone():
         parse_time("2026-06-24T12:00:00")
 
 
-# ── inspect_mcap — windowing ──────────────────────────────────────────────────
+# inspect_mcap windowing
 
 
 def test_inspect_window_returns_0(sample_mcap: Path, tmp_path: Path) -> None:
@@ -98,7 +98,7 @@ def test_inspect_empty_window(sample_mcap: Path, tmp_path: Path) -> None:
     assert len(msgs) == 0
 
 
-# ── inspect_mcap — topic filter ───────────────────────────────────────────────
+# inspect_mcap topic filter
 
 
 def test_inspect_topic_filter_count(sample_mcap: Path, tmp_path: Path) -> None:
@@ -130,7 +130,7 @@ def test_inspect_topic_and_window(sample_mcap: Path, tmp_path: Path) -> None:
     assert msg.log_time == 2_000_000
 
 
-# ── incident.mcap round-trip validity ────────────────────────────────────────
+# incident.mcap round-trip validity
 
 
 def test_incident_mcap_full_roundtrip(sample_mcap: Path, tmp_path: Path) -> None:

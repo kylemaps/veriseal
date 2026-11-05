@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 const here = fileURLToPath(new URL(".", import.meta.url));
 const root = join(here, "..");
 
-// The root Merkle root the Python veriseal CLI produced for this fixture.
+// The Merkle root the Python veriseal CLI produced for this fixture.
 const EXPECTED_ROOT = "9a75174f04a956e947427887468f63381b3914cafbc3f83b052620a2bc04a581";
 
 let failures = 0;
@@ -60,8 +60,8 @@ const sealText = readFileSync(join(here, "fixtures/sample.seal.json"), "utf8");
 const manifest = parseManifest(sealText);
 const genuineKey = manifest.signature.public_key;
 
-// Unpinned: signature + Merkle pass, but ok is false — authenticity to a real
-// identity is NOT established without an out-of-band key (SPEC 8).
+// Unpinned: signature + Merkle pass, but ok is false: authenticity to a real
+// identity is not established without an out-of-band key (SPEC 8).
 const genuine = await checkSeal(manifest);
 check("genuine, unpinned -> signature valid", genuine.signatureOk);
 check("genuine, unpinned -> merkle valid", genuine.merkleOk);
@@ -76,7 +76,7 @@ check("genuine, correct key pinned -> ok", pinnedOk.ok);
 check("  pubkeyPinned true", pinnedOk.pubkeyPinned === true);
 check("  pubkeyOk true", pinnedOk.pubkeyOk === true);
 
-// Pinned to a DIFFERENT key: not ok, key mismatch flagged.
+// Pinned to a different key: not ok, key mismatch flagged.
 const otherKey =
   "-----BEGIN PUBLIC KEY-----\n" +
   "MCowBQYDK2VwAyEA" +
@@ -110,14 +110,10 @@ check("non-manifest input rejected", !bad.ok && typeof bad.error === "string");
 const shape = crossCheckShape(manifest, { topics: new Set(["/pose", "/status", "/extra"]) });
 check("crossCheckShape flags unsealed topic", shape.extraTopics.join(",") === "/extra");
 
-// 7. Large leaf count (1237 leaves — not a power of two, well above the small
-// fixture size). Multi-level Merkle equivalence guard: locks the tree output to
-// the Python reference (src/veriseal/merkle.py) over the same leaves, catching a
-// wrong domain separator, sort order, or split rule. The split is now exact
-// integer math (`1 << (31 - Math.clz32(n-1))` == Python `1 << (n-1).bit_length()-1`);
-// note that within the valid domain (n-1 < 2^31) the previous float-based split
-// never actually diverged, so this test locks equivalence rather than catching
-// that specific change.
+// 7. Large leaf count (1237 leaves, not a power of two, well above the small
+// fixture size). Locks the multi-level tree output to the Python reference
+// (src/veriseal/merkle.py) over the same leaves, catching a wrong domain separator,
+// sort order, or split rule.
 const large = JSON.parse(readFileSync(join(here, "fixtures/large-leaves.json"), "utf8"));
 const largeRoot = await merkleRootFromLeaves(large.leaves);
 check(

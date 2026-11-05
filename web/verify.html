@@ -1,5 +1,5 @@
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-UT8MP8DpnDzIpSJGbkReUEl3lE34hAY2uKz46vxC2mU=' 'sha256-chSe5igGOgQHoPIDXhSCaQgezum34ZeaA2Xyf7Oj3ks='; style-src 'sha256-rn3j9olfqLDwcBVId9ys3s6+9cH6+HAcBdiuFp9yVxs='; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-UT8MP8DpnDzIpSJGbkReUEl3lE34hAY2uKz46vxC2mU=' 'sha256-rLSsc0GA4CGZ5yTsnxXJUgPGISaKhWJrMDlOIBy5KAA='; style-src 'sha256-rn3j9olfqLDwcBVId9ys3s6+9cH6+HAcBdiuFp9yVxs='; base-uri 'none'; form-action 'none'">
 <title>veriseal: independent verifier</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
@@ -292,10 +292,10 @@
 <script>
 "use strict";
 
-/* ---- state ---- */
+/* state */
 const state = { mcap: null, seal: null, mcapName: null, sealName: null, pubkey: "" };
 
-/* ---- canonical JSON: must byte-match veriseal.canonical.canonical_json ----
+/* canonical JSON: must byte-match veriseal.canonical.canonical_json
    Python: json.dumps(obj, sort_keys=True, ensure_ascii=False,
                        separators=(",", ":"), allow_nan=False)
    We reproduce: sorted object keys, no whitespace, UTF-8, ints kept exact. */
@@ -316,7 +316,7 @@ function canonicalize(value) {
   throw new Error("cannot canonicalize " + typeof value);
 }
 
-/* Parse a manifest exactly as strictly as the Python reference, so that both
+/* Parse a manifest as strictly as the Python reference, so that both
    accept and reject the same files. Integers only: Python's canonicaliser rejects
    floats, so 1.7e18 or 1.0 must fail here too rather than be read as an integer.
    Integers beyond 2^53 (log_time in ns) are kept exact as BigInt. Strings must be
@@ -400,7 +400,7 @@ function parseSeal(text) {
   return value;
 }
 
-/* ---- hex / base64 helpers ---- */
+/* hex / base64 helpers */
 function hexToBytes(hex) {
   const out = new Uint8Array(hex.length / 2);
   for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.substr(i * 2, 2), 16);
@@ -419,7 +419,7 @@ function pemToDer(pem) {
   return der;
 }
 
-/* ---- Merkle (RFC 6962), mirrors veriseal.merkle ---- */
+/* Merkle (RFC 6962), mirrors veriseal.merkle */
 async function sha256(bytes) {
   return new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
 }
@@ -433,9 +433,7 @@ async function internalNode(left, right) {
   return sha256(concat(new Uint8Array([0x01]), left, right));
 }
 // Largest power of two strictly less than n (RFC 6962 §2.1) = Python's
-// `1 << ((n-1).bit_length() - 1)`. Exact integer math via clz32: Math.log2 can
-// round a hair under the true integer for large n and pick the wrong split,
-// yielding a different (wrong) Merkle root on a genuine seal.
+// `1 << ((n-1).bit_length() - 1)`. Exact integer math via clz32, independent of float rounding.
 function largestPow2Below(n) { return 1 << (31 - Math.clz32(n - 1)); }
 async function merkleRoot(leafHashes) {
   const n = leafHashes.length;
@@ -449,7 +447,7 @@ async function merkleRoot(leafHashes) {
   return internalNode(l, r);
 }
 
-/* ---- verification ---- */
+/* verification */
 async function verifySignature(manifest) {
   const payload = {};
   for (const k of Object.keys(manifest)) {
@@ -475,7 +473,7 @@ function keyFingerprint(pem) {
   return bytesToHex(raw);
 }
 
-/* Raw 32-byte Ed25519 key as hex — for pinning. Compares raw key bytes so PEM
+/* Raw 32-byte Ed25519 key as hex, for pinning. Compares raw key bytes so PEM
    whitespace/encoding differences don't matter (mirrors CLI --pubkey). */
 function rawKeyHex(pem) {
   const der = pemToDer(pem);
@@ -487,10 +485,10 @@ function rawKeyHexSafe(pem) {
 }
 
 async function recomputeMerkle(manifest) {
-  // sort leaves by (log_time, topic, leaf_hash) — same as seal.
+  // sort leaves by (log_time, topic, leaf_hash), same as seal.
   // NOTE: `<` compares strings by UTF-16 code unit; the Python reference sorts by
   // Unicode code point. Agrees for the BMP, can diverge for astral-plane topics
-  // (> U+FFFF). Topics are expected ASCII — don't diverge from the Python sort.
+  // (> U+FFFF). Topics are expected ASCII; don't diverge from the Python sort.
   const leaves = manifest.leaves.slice().sort((a, b) => {
     if (a.log_time < b.log_time) return -1;
     if (a.log_time > b.log_time) return 1;
@@ -564,7 +562,7 @@ async function runVerification() {
   render({ status, result });
 }
 
-/* ---- rendering ----
+/* rendering
    Everything is built with createElement + text nodes, never innerHTML: values
    come from the files being checked, and a hostile file must not inject markup. */
 const el = (id) => document.getElementById(id);
@@ -706,7 +704,7 @@ function checkRow(status, name, desc, kvs) {
   return div;
 }
 
-/* ---- file wiring ---- */
+/* file wiring */
 function wireDrop(dropId, inputId, kind) {
   const drop = el(dropId), input = el(inputId);
   const onFile = (file) => {
@@ -750,9 +748,7 @@ el("pubkey").addEventListener("input", (e) => {
 
 el("reset").addEventListener("click", () => location.reload());
 
-/* ---- theme toggle passthrough already handled by tokens ---- */
-
-/* ---- sample loader: an embedded, self-contained sealed pair ---- */
+/* sample loader: an embedded, self-contained sealed pair */
 el("load-sample").addEventListener("click", async () => {
   const s = window.__SAMPLE__;
   if (!s) return;
@@ -775,7 +771,7 @@ el("load-sample").addEventListener("click", async () => {
 el("tamper").addEventListener("click", async () => {
   if (!state.mcap) return;
   // Flip the first byte of a message payload: the ASCII "nav_ok step=0" status
-  // string. Mirrors the CLI tamper demo — a single-byte change to real content.
+  // string. Mirrors the CLI tamper demo: a single-byte change to real content.
   const needle = new TextEncoder().encode("nav_ok step=0");
   let idx = -1;
   outer: for (let i = 0; i < state.mcap.length - needle.length; i++) {

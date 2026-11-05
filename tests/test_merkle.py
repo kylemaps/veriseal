@@ -11,7 +11,7 @@ def _internal(left: bytes, right: bytes) -> bytes:
     return hashlib.sha256(b"\x01" + left + right).digest()
 
 
-# ---------- leaf_hash ----------
+# leaf_hash
 
 
 def test_leaf_hash_deterministic():
@@ -33,7 +33,7 @@ def test_leaf_hash_differs_by_payload():
     assert leaf_hash("/t", 0, b"\x00") != leaf_hash("/t", 0, b"\x01")
 
 
-# ---------- merkle_root ----------
+# merkle_root
 
 
 def test_empty_root():

@@ -1,4 +1,4 @@
-"""Regression tests for the REAL `anchor.upgrade()` against a fake calendar.
+"""Regression tests for the real `anchor.upgrade()` against a fake calendar.
 
 `tests/test_anchor_upgrade.py` mocks `anchor.upgrade` wholesale, so it exercises
 `upgrade_manifest`'s bookkeeping but never `upgrade()` itself. That gap let a real
@@ -6,7 +6,7 @@ bug ship: `upgrade()` asked each calendar for a proof of `dtf.file_digest` and
 merged the reply into the ROOT timestamp. Both are wrong.
 
 A calendar does not commit to the file digest. It appends its own nonce and hashes,
-then attests to the result — a node DEEPER in the tree:
+then attests to the result, a node deeper in the tree:
 
     root (msg = file_digest)          <- no attestation
       └─ OpAppend(nonce)              (msg = file_digest || nonce)
@@ -18,7 +18,7 @@ together". Either way the proof stayed pending forever, and both failures were
 swallowed by `except Exception: pass`.
 
 These tests build that exact shape and drive the real `upgrade()` with a fake
-calendar that answers ONLY for the deep commitment, so the old behaviour cannot
+calendar that answers only for the deep commitment, so the old behaviour cannot
 pass. No network.
 """
 
@@ -46,7 +46,7 @@ def _pending_proof(file_digest: bytes) -> tuple[bytes, bytes]:
     """Build a realistic pending proof.
 
     Returns ``(serialized_ots_bytes, deep_commitment)`` where *deep_commitment* is
-    the message the calendar actually attested to — NOT the file digest.
+    the message the calendar attested to, not the file digest.
     """
     root = Timestamp(file_digest)
     appended = root.ops.add(OpAppend(_NONCE))
@@ -89,7 +89,7 @@ def test_upgrade_queries_the_attestations_own_commitment(
 ) -> None:
     """The calendar must be asked about the deep node, never the file digest."""
     ots_bytes, deep_commitment = _pending_proof(file_digest)
-    assert deep_commitment != file_digest  # the whole point
+    assert deep_commitment != file_digest  # the calendar committed to a deeper node
 
     queried: list[bytes] = []
     monkeypatch.setattr(anchor_mod, "RemoteCalendar", _fake_calendar(deep_commitment, queried))

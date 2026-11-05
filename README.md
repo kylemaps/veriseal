@@ -34,7 +34,7 @@ No log handy? In a clone of this repo, `python demo/make_sample.py log.mcap` wri
 # Generate a reusable signer key (and its public key, to share for pinning)
 veriseal keygen --out signer.key.pem --pub signer.pub.pem
 
-# Seal a log (submits Merkle root to OpenTimestamps by default)
+# Seal a log (submits the manifest's digest to OpenTimestamps by default)
 veriseal seal log.mcap --key signer.key.pem --out log.seal.json
 
 # Or seal fully offline, without OpenTimestamps (same key)
@@ -202,7 +202,7 @@ A seal proves that this log matches a seal made by key K at time T. Anyone can c
 
 A seal does not prove that the log is a truthful record of what happened. It cannot undo data that was false when it was captured. Integrity ≠ veracity.
 
-Neutrality comes from sealing as early as possible, ideally at capture, and anchoring the root in a public append-only log, so that no single party, the custodian included, can backdate or alter it.
+Neutrality comes from sealing as early as possible, ideally at capture, and anchoring the manifest in a public append-only log, so that no single party, the custodian included, can backdate or alter it.
 
 > The Merkle root covers message content: each message's topic, log time and payload bytes. `source.sha256` is a separate byte-level check of the whole file, and both must pass for INTACT. A losslessly re-muxed MCAP with identical messages therefore verifies TAMPERED, but with only a source-digest mismatch: no Merkle mismatch and no MODIFIED/ADDED/REMOVED lines, which tells you the messages themselves are unchanged.
 
@@ -219,7 +219,7 @@ The `.seal.json` format is fully documented in [SPEC-manifest.md](https://github
 
 ```
 seal     ingest MCAP → hash every message → RFC 6962 Merkle tree →
-         sign manifest (Ed25519) → anchor root (OpenTimestamps/Bitcoin) → *.seal.json
+         sign manifest (Ed25519) → anchor manifest (OpenTimestamps/Bitcoin) → *.seal.json
 
 verify   recompute Merkle tree from MCAP → check signature → compare roots →
          INTACT or TAMPERED (locate modified/added/removed messages)

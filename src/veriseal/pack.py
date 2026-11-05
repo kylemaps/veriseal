@@ -1,16 +1,16 @@
-"""veriseal pack — build a portable incident-evidence bundle from a sealed MCAP.
+"""veriseal pack: build a portable incident-evidence bundle from a sealed MCAP.
 
 The bundle lets a recipient (court, insurer, regulator) independently re-verify a
 sealed log without trusting the operator or veriseal: the manifest, a human-readable
 report, the OpenTimestamps proof, and a fully offline copy of the standalone web
-verifier are all included. This module renders the SAME `VerificationResult` that
-`veriseal verify` computes (see `veriseal.verify.run_verification`) — it does not
+verifier are all included. This module renders the same `VerificationResult` that
+`veriseal verify` computes (see `veriseal.verify.run_verification`) and does not
 recompute integrity checks on its own.
 
-Every claim in the generated report is scoped to what the crypto actually proves:
+Every claim in the generated report is limited to what the crypto proves:
 integrity-since-sealing and authenticity-to-a-key. It never asserts the log's
-CONTENTS are true (a compromised recorder can still sign false data), and it never
-claims the bundle "satisfies" or "complies with" any regulation — only that it
+contents are true (a compromised recorder can still sign false data), and it never
+claims the bundle "satisfies" or "complies with" any regulation, only that it
 supports a disclosure obligation by providing tamper-evident, independently
 verifiable logs.
 """
@@ -44,9 +44,8 @@ def _read_web_verifier() -> bytes:
 
     Tries the packaged asset first (present in a pip-installed wheel via the
     force-include in pyproject.toml), then the repo-relative copy (source checkout
-    or editable install). Raises if neither is found: the pack's cover sheet and
-    README name verify.html as included, so building a pack without it would be
-    dishonest — we refuse rather than ship a bundle that misrepresents itself.
+    or editable install). Raises if neither is found, because the pack's cover sheet and README say
+    verify.html is included.
     """
     try:
         packaged = _resource_files("veriseal").joinpath("_assets/verify.html")
@@ -152,8 +151,8 @@ def _anchor_report_lines(result: VerificationResult) -> list[str]:
 
 def _build_report(result: VerificationResult, generated_at: datetime) -> str:
     """Human-readable verification report. Deterministic given the same manifest
-    and MCAP, EXCEPT the 'Report generated' line, which is explicitly labelled
-    and excluded from any hash or signature — it is not part of the evidence."""
+    and MCAP, except the 'Report generated' line, which is labelled as such and excluded from
+    any hash or signature because it is not part of the evidence."""
     m = result.manifest
     lines: list[str] = []
     lines.append("=" * 72)

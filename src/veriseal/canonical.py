@@ -1,14 +1,14 @@
-"""Canonical JSON serialisation — deterministic bytes for signing.
+"""Canonical JSON serialisation: deterministic bytes for signing.
 
 The signed payload MUST NOT contain floating-point numbers. Python's `json`
 formats floats differently from JavaScript's `JSON.stringify`/`String(x)` (e.g.
 Python emits `1.0` where JS emits `1`, and the two disagree on precision and
 exponent formatting for many values), so a float anywhere in the manifest would
-make the canonical bytes — and therefore the Ed25519 signature — diverge between
-the Python reference and the browser/panel verifiers, silently breaking
-cross-verifier verification. veriseal's schema uses only integers (log_time in
-ns, byte sizes, counts), so we reject floats outright rather than trust that no
-one ever adds a float field later. See SPEC-manifest.md 1.
+make the canonical bytes, and so the Ed25519 signature, diverge between the
+Python reference and the browser and panel verifiers, and a genuine seal would
+fail in one of them. veriseal's schema uses only integers (log_time in ns, byte
+sizes, counts), so we reject floats outright rather than trust that no one ever
+adds a float field later. See SPEC-manifest.md 1.
 """
 
 from __future__ import annotations
@@ -21,8 +21,8 @@ def reject_floats(obj: object, path: str = "$") -> None:
 
     Note: `bool` is a subclass of `int` and is allowed; only real floats are
     rejected. `allow_nan=False` in json.dumps already blocks NaN/Infinity, but
-    that permits finite floats like 1.0 — those are exactly the ones that would
-    diverge between Python and JS, so they are caught here.
+    that permits finite floats like 1.0, which are the ones that would diverge
+    between Python and JS, so they are caught here.
     """
     if isinstance(obj, float):
         raise ValueError(

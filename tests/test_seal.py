@@ -17,7 +17,7 @@ from veriseal.mcap_io import file_digest, iter_messages
 from veriseal.seal import seal
 from veriseal.signing import verify
 
-# Fixed 32-byte seed — deterministic key for all seal tests.
+# Fixed 32-byte seed: deterministic key for all seal tests.
 _SEED = bytes(range(32))
 _FIXED_KEY = Ed25519PrivateKey.from_private_bytes(_SEED)
 _FIXED_TIME = datetime(2026, 6, 24, 12, 0, 0, tzinfo=UTC)
@@ -107,7 +107,7 @@ def test_seal_command_writes_files(sample_mcap: Path) -> None:
     assert manifest["signature"]["public_key"] == public_pem(load_private_pem(key_path))
 
 
-# ── memory: payloads are hashed as they are read, never all held at once ─────
+# memory: payloads are hashed as they are read, never all held at once
 
 
 def test_build_manifest_streams_payloads(sample_mcap: Path) -> None:

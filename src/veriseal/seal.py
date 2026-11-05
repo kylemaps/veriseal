@@ -27,7 +27,7 @@ _LOG_EXTENSIONS = (".mcap", ".bag")
 def _derive_output(path: Path, new_ext: str) -> Path:
     """Return *path* with its final known log extension replaced by *new_ext*.
 
-    Uses the full filename and strips ONLY the final recognised extension, so
+    Uses the full filename and strips only the final recognised extension, so
     ``data.2026.mcap`` -> ``data.2026.seal.json`` (not ``data.seal.json``).
     ``Path.with_suffix`` would drop the ``.2026`` segment and let distinct inputs
     (``data.2026.mcap`` / ``data.2025.mcap``) collide onto one output.

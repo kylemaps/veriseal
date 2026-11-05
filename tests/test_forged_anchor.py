@@ -1,7 +1,7 @@
-"""Forged-anchor detection using the REAL verify_anchor (no mock).
+"""Forged-anchor detection using the real verify_anchor (no mock).
 
 A doctored anchor whose `commits` field is edited to match the manifest but whose
-`ots_base64` proof actually binds a DIFFERENT digest must be rejected under
+`ots_base64` proof binds a different digest must be rejected under
 --require-anchor. The commits string alone is attacker-controlled text; the proof
 bytes are what bind a digest, and verify_anchor cross-checks them. A proof that binds
 the right digest to a made-up Bitcoin attestation must not pass either: the block it

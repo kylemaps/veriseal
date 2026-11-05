@@ -78,7 +78,7 @@ def test_cli_new_key_seals_and_prints_public_key(sample_mcap: Path, tmp_path: Pa
     assert "BEGIN PUBLIC KEY" in result.output
 
 
-# ── key files: owner-only, never overwritten, optional passphrase ────────────
+# key files: owner-only, never overwritten, optional passphrase
 
 posix_only = pytest.mark.skipif(os.name != "posix", reason="file modes are POSIX-only")
 

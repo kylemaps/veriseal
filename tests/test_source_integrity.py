@@ -1,12 +1,11 @@
 """Source-file integrity is part of the verdict, plus verify edge cases.
 
-The central guard here locks the Commit-1 fix: a change to NON-message bytes
-(MCAP metadata/attachment/header — anything outside the sealed
-(topic, log_time, payload) triples) leaves the Merkle root and signature valid
-but changes the file's SHA-256, and MUST make the overall verdict TAMPERED.
-Before the fix, `source_ok` was computed but excluded from the CLI/pack verdict,
-so such a file read INTACT in Python while the web verifier (which gates on the
-file digest) read TAMPERED. This test asserts the two now agree.
+The central guard here: a change to non-message bytes (MCAP metadata, attachments or
+header, anything outside the sealed (topic, log_time, payload) triples) leaves the
+Merkle root and signature valid but changes the file's SHA-256, and MUST make the
+overall verdict TAMPERED. Without `source_ok` in the CLI and pack verdict, such a file
+reads INTACT in Python while the web verifier (which gates on the file digest) reads
+TAMPERED. This test asserts the two agree.
 """
 
 from __future__ import annotations
@@ -21,7 +20,7 @@ from veriseal.canonical import canonical_json
 from veriseal.seal import seal
 from veriseal.verify import run_verification, verify_seal
 
-# ── helpers ──────────────────────────────────────────────────────────────────
+# helpers
 
 
 def _write_mcap(
@@ -62,7 +61,7 @@ _MESSAGES: list[tuple[str, int, bytes]] = [
 ]
 
 
-# ── item 1: non-message byte change → source fails, merkle passes → TAMPERED ──
+# non-message byte change: source fails, merkle passes, TAMPERED
 
 
 def test_non_message_change_is_tampered(tmp_path: Path) -> None:
@@ -97,7 +96,7 @@ def test_intact_requires_source_ok(tmp_path: Path) -> None:
     assert verify_seal(mcap, seal_path, allow_unpinned=True) == 0
 
 
-# ── item 5: edge cases ───────────────────────────────────────────────────────
+# edge cases
 
 
 def test_duplicate_identical_messages_intact(tmp_path: Path) -> None:

@@ -1,7 +1,7 @@
 """web/verify.html must not let a hostile file inject markup, and must parse like Python.
 
 The page renders values read from the files being checked, so it builds its DOM with
-text nodes only and ships a Content-Security-Policy that allows exactly its own inline
+text nodes only and ships a Content-Security-Policy that allows only its own inline
 script and style (by hash). Its manifest parser must accept and reject the same inputs
 as the Python reference, or the two verifiers could disagree about the same seal; the
 parser tests run the page's own JavaScript under Node when it is available.
@@ -48,7 +48,7 @@ def _directive(name: str) -> list[str]:
     return []
 
 
-# ── markup and policy ────────────────────────────────────────────────────────
+# markup and policy
 
 
 def test_charset_is_declared_first() -> None:
@@ -86,7 +86,7 @@ def test_script_never_parses_strings_as_html() -> None:
         assert not re.search(sink, script), sink
 
 
-# ── parser agreement with Python (needs Node) ────────────────────────────────
+# parser agreement with Python (needs Node)
 
 
 def _js_function(name: str) -> str:

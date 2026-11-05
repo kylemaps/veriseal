@@ -1,4 +1,4 @@
-"""veriseal inspect command — time-windowed incident slice."""
+"""veriseal inspect command: time-windowed incident slice."""
 
 from __future__ import annotations
 
@@ -71,7 +71,7 @@ def inspect_mcap(
     if out_path is None:
         out_path = path.with_name(path.stem + ".incident.mcap")
 
-    # ── Read and filter ───────────────────────────────────────────────────────
+    # Read and filter
     windowed: list[tuple] = []  # (schema | None, channel, message)
     try:
         with open(path, "rb") as f:
@@ -89,7 +89,7 @@ def inspect_mcap(
     # iter_messages delivers in log_time order; re-sort to be explicit.
     windowed.sort(key=lambda t: t[2].log_time)
 
-    # ── Timeline table ────────────────────────────────────────────────────────
+    # Timeline table
     table = Table(
         title=f"Window [{from_ns} ns, {to_ns} ns]: {len(windowed)} message(s)",
         show_lines=False,
@@ -113,7 +113,7 @@ def inspect_mcap(
 
     console.print(table)
 
-    # ── Write incident MCAP ───────────────────────────────────────────────────
+    # Write incident MCAP
     try:
         with open(out_path, "wb") as f:
             writer = Writer(f)

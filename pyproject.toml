@@ -50,7 +50,7 @@ Changelog = "https://github.com/kylemaps/veriseal/releases"
 [tool.hatch.build.targets.sdist]
 # Ship only the Python package sources + docs in the sdist. `only-include` is
 # restrictive (a plain `include` is additive and still drags in the whole tree,
-# e.g. veriseal-panel/node_modules — hundreds of MB). The TS panel is a separate
+# e.g. veriseal-panel/node_modules, hundreds of MB). The TS panel is a separate
 # sub-project, not part of the Python distribution. (pyproject.toml + PKG-INFO
 # are added by hatchling automatically.)
 only-include = [

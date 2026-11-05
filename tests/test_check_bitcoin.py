@@ -38,7 +38,7 @@ GENESIS_HASH = "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f
 BLOCK_TIME = 1_786_939_553  # 2026-08-17 04:05:53 UTC
 
 
-# ── helpers ──────────────────────────────────────────────────────────────────
+# helpers
 
 
 def _header(merkle_root: bytes, nonce: int = 0) -> bytes:
@@ -91,7 +91,7 @@ DIGEST = hashlib.sha256(b"a manifest").digest()
 PROOF_900K = _ots(DIGEST, BitcoinBlockHeaderAttestation(900_000))
 
 
-# ── block headers ────────────────────────────────────────────────────────────
+# block headers
 
 
 def test_genesis_header_hashes_to_the_genesis_block() -> None:
@@ -129,7 +129,7 @@ def test_a_malformed_block_hash_never_reaches_a_url() -> None:
     assert requests == [f"{SOURCES[0]}/block-height/0"]
 
 
-# ── check_bitcoin ────────────────────────────────────────────────────────────
+# check_bitcoin
 
 
 def test_verified_when_every_source_returns_the_attested_block() -> None:
@@ -206,7 +206,7 @@ def test_a_later_block_still_verifies_when_an_earlier_one_cannot_be_fetched() ->
     assert result.height == 900_005
 
 
-# ── verify ───────────────────────────────────────────────────────────────────
+# verify
 
 
 def _write_mcap(path: Path) -> Path:
@@ -322,7 +322,7 @@ def test_cli_check_bitcoin_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
     assert "verified against Bitcoin" in " ".join(result.stdout.split())
 
 
-# ── pack ─────────────────────────────────────────────────────────────────────
+# pack
 
 
 def _report(tmp_path: Path, mcap: Path, seal_path: Path, check: bool) -> str:
@@ -370,7 +370,7 @@ def test_pack_stays_offline_unless_asked(tmp_path: Path) -> None:
     assert "report was built without comparing it with the block itself" in report
 
 
-# ── a real proof from the public calendars, against its real block ───────────
+# a real proof from the public calendars, against its real block
 
 VECTOR = json.loads(
     (Path(__file__).resolve().parents[1] / "conformance" / "bitcoin-check.json").read_text(

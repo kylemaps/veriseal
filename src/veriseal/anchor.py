@@ -1,4 +1,4 @@
-"""OpenTimestamps anchoring — submit/verify/upgrade OTS proofs, and check them against Bitcoin."""
+"""OpenTimestamps anchoring: submit/verify/upgrade OTS proofs, and check them against Bitcoin."""
 
 from __future__ import annotations
 
@@ -68,9 +68,9 @@ def verify_anchor(digest: bytes, ots_bytes: bytes) -> tuple[str, int | None]:
     """Check that *ots_bytes* commits to *digest*, and report what the proof claims.
 
     Returns (status, bitcoin_block_height_or_None) where status is:
-      "confirmed" — the proof carries a Bitcoin block attestation, as supplied by a
-                    calendar. NOT checked against Bitcoin: no block header is fetched.
-      "pending"   — only calendar (pending) attestations present
+      "confirmed": the proof carries a Bitcoin block attestation, as supplied by a
+                   calendar. Not checked against Bitcoin: no block header is fetched.
+      "pending":   only calendar (pending) attestations present
 
     Raises ValueError if the embedded proof digest does not match *digest*.
     """
@@ -99,13 +99,13 @@ class BitcoinCheck:
     """Outcome of checking a proof's Bitcoin attestations against real block headers.
 
     ``status`` is one of:
-      "verified"  — every source returned the same header for the attested block, and
-                    the proof computes exactly that header's Merkle root. The manifest
-                    existed no later than that block.
-      "false"     — the sources agree on the block, but the proof does not compute its
-                    Merkle root: the attestation is wrong (forged or corrupted).
-      "unchecked" — no answer either way: the proof has no Bitcoin attestation yet, a
-                    source was unreachable, or the sources disagreed.
+      "verified":  every source returned the same header for the attested block, and
+                   the proof computes that header's Merkle root. The manifest existed
+                   no later than that block.
+      "false":     the sources agree on the block, but the proof does not compute its
+                   Merkle root: the attestation is wrong (forged or corrupted).
+      "unchecked": no answer either way: the proof has no Bitcoin attestation yet, a
+                   source was unreachable, or the sources disagreed.
     """
 
     status: str
@@ -175,7 +175,7 @@ def check_bitcoin(
     each one, fetch block N's header from every source and compare that root with
     what the proof computes. Returns the earliest block that checks out; otherwise a
     "false" result if a block contradicts the proof, else "unchecked". Never raises
-    for network trouble: the anchor is simply left unchecked.
+    for network trouble: the anchor is left unchecked.
 
     Raises ValueError if the proof does not commit to *digest*, as verify_anchor does.
     """
@@ -245,7 +245,7 @@ def upgrade(ots_bytes: bytes) -> bytes:
     # added). So we must (a) ask the calendar about that node's own message, and
     # (b) merge the reply into that same node. Querying with dtf.file_digest
     # 404s, and merging into the root raises "Can't merge timestamps for
-    # different messages together" — either way the proof stays pending forever.
+    # different messages together". Either way the proof stays pending forever.
     for node in list(_walk_timestamps(dtf.timestamp)):
         for att in list(node.attestations):
             if isinstance(att, PendingAttestation):
@@ -265,12 +265,12 @@ def upgrade_manifest(manifest: dict) -> tuple[str, int | None, bool]:
     """Upgrade a manifest's embedded OpenTimestamps proof in place (network).
 
     Asks the calendars whether the pending proof is now included in a Bitcoin
-    block. The anchor block is EXCLUDED from the signed payload, so updating it
+    block. The anchor block is excluded from the signed payload, so updating it
     never invalidates the manifest signature.
 
     Returns ``(status, block_height, changed)``:
       - ``status``: ``"none"`` (no OTS anchor), ``"mismatch"`` (the proof does not
-        commit to this manifest — altered file or wrong proof), ``"pending"``
+        commit to this manifest: altered file or wrong proof), ``"pending"``
         (acknowledged by a calendar but not yet in a Bitcoin block), or
         ``"confirmed"`` (a calendar supplied a Bitcoin attestation; not checked against
         Bitcoin).
@@ -279,8 +279,7 @@ def upgrade_manifest(manifest: dict) -> tuple[str, int | None, bool]:
         bytes and/or a newly-recorded confirmation) and should be written back.
 
     On confirmation, sets ``anchor["status"] = "confirmed"`` and
-    ``anchor["bitcoin_block_height"]``. Never records a confirmation the proof
-    does not actually carry.
+    ``anchor["bitcoin_block_height"]``. Never records a confirmation the proof does not carry.
     """
     anchor = manifest.get("anchor")
     if not anchor or anchor.get("type") != "opentimestamps" or not anchor.get("ots_base64"):

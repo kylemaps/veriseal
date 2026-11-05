@@ -47,7 +47,7 @@ def build_manifest(
     # Sort by (log_time, topic, leaf_hash). Python orders strings by Unicode code
     # point; the JS verifiers (web/verify.html, sealcore.ts) use `<`, which orders
     # by UTF-16 code unit. These agree for the BMP but can differ for astral-plane
-    # (> U+FFFF) topic names — keep topics ASCII, and do NOT introduce a sort here
+    # (> U+FFFF) topic names. Keep topics ASCII, and do not introduce a sort here
     # that would diverge from the JS side. See SPEC-manifest.md 1.
     sorted_leaves = sorted(
         raw_leaves, key=lambda item: (item["log_time"], item["topic"], item["leaf_hash"])

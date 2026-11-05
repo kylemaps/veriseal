@@ -5,7 +5,7 @@ Run it on the robot's own computer with the logs it records:
     python bench/measure.py LOG [LOG ...] --runs 5 --out results.json
 
 Each run executes the real `veriseal seal` (offline, --no-anchor) and `veriseal verify` as
-child processes, exactly as a deployment would, and records wall time, CPU time and peak
+child processes, as a deployment would, and records wall time, CPU time and peak
 memory for each. If the machine has a power sensor (Jetson tegrastats or INA3221, the
 Raspberry Pi 5 PMIC, Intel RAPL, or a discharging battery), power is sampled while idle
 and during every run, and the extra energy used by sealing is reported. Nothing is sent
@@ -36,7 +36,7 @@ from pathlib import Path
 VERISEAL = [sys.executable, "-c", "from veriseal.cli import app; app()"]
 
 
-# ── power sources ────────────────────────────────────────────────────────────
+# power sources
 
 
 @dataclass
@@ -254,7 +254,7 @@ class PowerMeter:
         return {"mean_w": statistics.fmean(self._samples), "samples": len(self._samples)}
 
 
-# ── running veriseal ─────────────────────────────────────────────────────────
+# running veriseal
 
 
 @dataclass

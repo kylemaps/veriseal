@@ -25,7 +25,7 @@ def test_nan_and_inf_rejected() -> None:
 
 
 def test_ints_and_bools_allowed() -> None:
-    # bool is a subclass of int and must NOT be rejected.
+    # bool is a subclass of int and must not be rejected.
     out = canonical_json({"a": 1, "b": True, "c": [1, 2, 3], "d": "s", "e": None})
     assert b'"b":true' in out
     assert b'"a":1' in out

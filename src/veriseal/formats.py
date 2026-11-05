@@ -6,10 +6,9 @@ container format onto those triples, so the same seal/verify pipeline covers
 more than MCAP without changing the manifest format or the crypto.
 
 Supported today:
-  - MCAP        (``.mcap``) — native.
-  - ROS 1 bag   (``.bag``)  — via the optional ``rosbags`` dependency
-                              (``pip install veriseal[ros1]``); pure Python, no
-                              ROS installation required.
+  - MCAP (``.mcap``): native.
+  - ROS 1 bag (``.bag``): via the optional ``rosbags`` dependency
+    (``pip install veriseal[ros1]``); pure Python, no ROS installation required.
 
 Both seal and verify read the same file through the same reader, so the
 recomputed leaves match byte-for-byte regardless of format.

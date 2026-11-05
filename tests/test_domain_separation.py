@@ -14,7 +14,7 @@ import hashlib
 
 from veriseal.merkle import leaf_hash, merkle_root
 
-# ── Known answers (hardcoded; recompute only if the SPEC wire format changes) ──
+# Known answers (hardcoded; recompute only if the SPEC wire format changes)
 
 _KA_LEAF_A_0_BC = "8fb9e04fb02cd05202f969ee619fdf99897c9868f4941faa1c632f0d3cda379e"
 _KA_LEAF_AB_0_C = "8b888d87e1366ce1b1b1b5ff9b047a3ef0ec225f88ca9238bff7a5db2b1b7052"
@@ -39,7 +39,7 @@ def test_empty_and_single_known_answer() -> None:
     assert merkle_root([h]) == h  # single leaf returns the (already-hashed) leaf
 
 
-# ── Domain separation: the topic length-prefix must disambiguate boundaries ──
+# Domain separation: the topic length-prefix must disambiguate boundaries
 
 
 def test_topic_length_prefix_prevents_collision() -> None:
@@ -49,12 +49,12 @@ def test_topic_length_prefix_prevents_collision() -> None:
     assert leaf_hash("/a", 0, b"bc") != leaf_hash("/ab", 0, b"c")
 
 
-# ── Domain separation: the RFC 6962 leaf/internal prefixes are load-bearing ──
+# Domain separation: the RFC 6962 leaf and internal prefixes
 
 
 def test_leaf_prefix_0x00_is_part_of_the_hash() -> None:
     """The leaf hash is SHA-256(0x00 + preimage). Dropping the 0x00 prefix (or
-    using a different one) must produce a different digest — pinning the domain
+    using a different one) must produce a different digest. This pins the domain
     separator independently of leaf_hash()."""
     topic, log_time, payload = "/pose", 7, b"\x09"
     topic_bytes = topic.encode("utf-8")
@@ -75,9 +75,8 @@ def test_leaf_prefix_0x00_is_part_of_the_hash() -> None:
 
 def test_internal_node_prefix_0x01_is_part_of_the_hash() -> None:
     """Internal nodes are SHA-256(0x01 + left + right). A node computed without
-    the 0x01 prefix, or with a leaf prefix, must differ from the real root —
-    guarding against second-preimage attacks that RFC 6962 domain separation
-    exists to prevent."""
+    the 0x01 prefix, or with a leaf prefix, must differ from the real root. RFC 6962
+    domain separation exists to prevent second-preimage attacks."""
     l0 = leaf_hash("/a", 1, b"x")
     l1 = leaf_hash("/b", 2, b"y")
     real = merkle_root([l0, l1])

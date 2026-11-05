@@ -1,4 +1,4 @@
-"""Generate demo/sample.mcap — a synthetic AV-style log for the veriseal demo.
+"""Generate demo/sample.mcap, a synthetic AV-style log for the veriseal demo.
 
 Usage: python demo/make_sample.py [output_path]
 

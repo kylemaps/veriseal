@@ -6,15 +6,13 @@
  *   - merkleRoot()     <-> veriseal.merkle.merkle_root (RFC 6962, 0x00/0x01 domain sep)
  *   - verifySignature()<-> veriseal.signing.verify (Ed25519 over manifest sans signature/anchor)
  *
- * IMPORTANT: a Foxglove panel only ever sees *deserialized* messages, never the
- * raw serialized payload bytes that veriseal hashes into leaves. So this core
- * deliberately does NOT try to recompute leaf hashes from a live message stream.
- * What it proves in-panel:
+ * A Foxglove panel only ever sees deserialized messages, never the raw serialized
+ * payload bytes that veriseal hashes into leaves, so this core does not try to
+ * recompute leaf hashes from a live message stream. What it proves in-panel:
  *   1. the manifest is authentic to its Ed25519 key (signature), and
  *   2. the listed leaf hashes fold to the signed Merkle root.
  * Whole-file byte integrity (SHA-256 of the .mcap) is the job of the CLI and the
- * standalone web verifier, which have the raw bytes. This module is honest about
- * that boundary rather than faking a proof it cannot compute.
+ * standalone web verifier, which have the raw bytes.
  */
 
 export interface SealLeaf {
@@ -45,8 +43,8 @@ export interface SealCheckResult {
   /** True when the caller supplied an expected signer key to pin against. */
   pubkeyPinned: boolean;
   /** True only when a key was pinned AND it matches the manifest's key. When no
-   *  key is pinned this is false: authenticity to a real identity is NOT
-   *  established, and callers must not render a fully-verified (green) state. */
+   *  key is pinned this is false: authenticity to a real identity
+   *  is not established, and callers must not render a fully-verified (green) state. */
   pubkeyOk: boolean;
   signedRoot: string;
   recomputedRoot: string;
@@ -58,7 +56,7 @@ export interface SealCheckResult {
   error?: string;
 }
 
-/* ---- canonical JSON: must byte-match veriseal.canonical.canonical_json ----
+/* canonical JSON: must byte-match veriseal.canonical.canonical_json
    Python: json.dumps(obj, sort_keys=True, ensure_ascii=False,
                        separators=(",", ":"), allow_nan=False) */
 export function canonicalize(value: unknown): string {
@@ -79,7 +77,7 @@ export function canonicalize(value: unknown): string {
   throw new Error("cannot canonicalize " + typeof value);
 }
 
-/* Parse a manifest exactly as strictly as the Python reference, so both accept
+/* Parse a manifest as strictly as the Python reference, so both accept
    and reject the same files. Integers only: Python's canonicaliser rejects floats,
    so 1.7e18 or 1.0 must fail here too rather than be read as an integer. Integers
    beyond 2^53 (log_time ns) are kept exact as BigInt. Strings must be well-formed
@@ -192,7 +190,7 @@ export function parseManifest(text: string): SealManifest {
   return value as SealManifest;
 }
 
-/* ---- hex / base64 / PEM helpers ----
+/* hex / base64 / PEM helpers
    All byte arrays are ArrayBuffer-backed (Bytes) so they satisfy WebCrypto's
    BufferSource, which excludes SharedArrayBuffer-backed views. */
 type Bytes = Uint8Array<ArrayBuffer>;
@@ -228,7 +226,7 @@ function utf8(s: string): Bytes {
   return out;
 }
 
-/* ---- SHA-256 + RFC 6962 Merkle, mirrors veriseal.merkle ---- */
+/* SHA-256 + RFC 6962 Merkle, mirrors veriseal.merkle */
 async function sha256(bytes: Bytes): Promise<Bytes> {
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   return new Uint8Array(digest);
@@ -251,11 +249,8 @@ async function internalNode(left: Bytes, right: Bytes): Promise<Bytes> {
 }
 /**
  * Largest power of two strictly less than n (RFC 6962 §2.1), i.e. Python's
- * `1 << ((n - 1).bit_length() - 1)`. Exact integer math (clz32), so the split is
- * provably identical to the Python reference with no dependence on float rounding.
- * (An earlier version used `1 << Math.floor(Math.log2(n - 1))`; within the valid
- * domain, n-1 < 2^31, that never actually diverged, but exact-by-construction
- * removes any doubt and any need to reason about IEEE-754 edge cases.)
+ * `1 << ((n - 1).bit_length() - 1)`. Exact integer math (clz32), so the split
+ * matches the Python reference with no dependence on float rounding.
  */
 function largestPow2Below(n: number): number {
   return 1 << (31 - Math.clz32(n - 1));
@@ -317,7 +312,7 @@ async function verifySignature(manifest: SealManifest): Promise<{ ok: boolean; e
 }
 
 function sortLeaves(leaves: readonly SealLeaf[]): SealLeaf[] {
-  // sort by (log_time, topic, leaf_hash) ascending — same as seal.
+  // sort by (log_time, topic, leaf_hash) ascending, same as seal.
   // NOTE: `<` on strings compares by UTF-16 code unit, whereas the Python
   // reference sorts by Unicode code point. These agree for the BMP but can
   // diverge for astral-plane (> U+FFFF) topic names. Topics are expected ASCII;

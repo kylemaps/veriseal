@@ -22,7 +22,7 @@ json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow
 )
 ```
 
-> **Note:** This is NOT RFC 8785 (JCS). JCS requires Unicode escape sequences for certain code points and has additional constraints not present here.
+> **Note:** This is not RFC 8785 (JCS). JCS requires Unicode escape sequences for certain code points and has additional constraints not present here.
 
 > **No floating-point numbers.** The signed payload MUST contain only integers, never floats. Python and JavaScript serialize floats differently (e.g. `1.0` vs `1`, and they disagree on precision/exponent formatting), which would make the canonical bytes, and so the signature, diverge between a Python and a browser verifier. veriseal's schema is all-integer (nanosecond times, byte sizes, counts); `veriseal seal` rejects any float in the payload rather than emit non-portable canonical bytes.
 
@@ -73,11 +73,11 @@ k = 1 << ((n - 1).bit_length() - 1)
 
 `b"\x01"` is the RFC 6962 domain separator for internal nodes.
 
-> **Note:** Input leaves are **already hashed** (the `0x00`-prefixed leaf hashes from §2). `MTH([h])` returns `h` directly without double-hashing.
+> **Note:** Input leaves are already hashed (the `0x00`-prefixed leaf hashes from §2). `MTH([h])` returns `h` directly without double-hashing.
 
 ## 4. Signed payload
 
-The Ed25519 signature covers **canonical JSON of the manifest with `"signature"` and `"anchor"` keys removed**:
+The Ed25519 signature covers canonical JSON of the manifest with the `"signature"` and `"anchor"` keys removed:
 
 ```python
 signed_payload = canonical_json(
@@ -91,21 +91,21 @@ This commits to: `schema_version`, `tool_version`, `created_utc`, `source`, `mes
 
 ```jsonc
 {
-  // ── Identity ────────────────────────────────────────────────────────────────
-  "schema_version": "veriseal-manifest-v1",   // literal — identifies this spec
+  // Identity
+  "schema_version": "veriseal-manifest-v1",   // literal; identifies this spec
   "tool_version": "0.1.1",                     // semver of the sealing tool
 
   "created_utc": "2026-06-24T04:44:08Z",      // ISO 8601, UTC, second precision, Z suffix
 
-  // ── Source file ─────────────────────────────────────────────────────────────
+  // Source file
   "source": {
     "filename": "log.mcap",                   // basename of the sealed file
-    "format": "mcap",                         // "mcap" | "rosbag1" — container the leaves came from
+    "format": "mcap",                         // "mcap" | "rosbag1": container the leaves came from
     "sha256": "<64 lower-case hex chars>",    // SHA-256 of raw file bytes
     "size_bytes": 123456                      // byte length of the file (integer)
   },
 
-  // ── Message summary ─────────────────────────────────────────────────────────
+  // Message summary
   "messages": {
     "count": 42,                              // total message count (integer)
     "log_time_min": 1000000,                  // minimum log_time_ns (integer)
@@ -114,14 +114,14 @@ This commits to: `schema_version`, `tool_version`, `created_utc`, `source`, `mes
 
   "hash_alg": "SHA-256",                      // hash algorithm used for leaves and Merkle
 
-  // ── Merkle tree ─────────────────────────────────────────────────────────────
+  // Merkle tree
   "merkle": {
     "scheme": "RFC6962-SHA256",               // identifies the tree construction
     "root": "<64 lower-case hex chars>",      // MTH of all leaves (see §3)
     "ordering": "log_time,topic,leaf_hash asc" // normative leaf sort key
   },
 
-  // ── Leaf index ──────────────────────────────────────────────────────────────
+  // Leaf index
   "leaves": [
     {
       "index": 0,                             // 0-based position in sorted leaf order
@@ -132,14 +132,14 @@ This commits to: `schema_version`, `tool_version`, `created_utc`, `source`, `mes
     // … one object per message, sorted by (log_time, topic, leaf_hash) asc
   ],
 
-  // ── Signature ───────────────────────────────────────────────────────────────
+  // Signature
   "signature": {
     "alg": "Ed25519",                         // signature algorithm
     "public_key": "-----BEGIN PUBLIC KEY-----\n…\n-----END PUBLIC KEY-----\n",
     "value": "<128 lower-case hex chars>"     // 64-byte Ed25519 signature over signed_payload
   },
 
-  // ── Anchor — null if --no-anchor (see §6) ───────────────────────────────────
+  // Anchor: null if --no-anchor (see §6)
   "anchor": null
 }
 ```
@@ -165,13 +165,13 @@ When `--anchor` is used (the default), `"anchor"` is replaced with:
 
   "submitted_utc": "2026-06-24T04:44:08Z",   // ISO 8601 UTC time of OTS submission
 
-  // Present ONLY when status == "confirmed" (added by `veriseal anchor upgrade`):
+  // Present only when status == "confirmed" (added by `veriseal anchor upgrade`):
   // the Bitcoin block height whose header attests the committed digest.
   "bitcoin_block_height": 812345
 }
 ```
 
-When `status` is `"pending"`, the `bitcoin_block_height` key is absent. `veriseal anchor upgrade` asks the OpenTimestamps calendars whether the proof has been included in a Bitcoin block; if so, it rewrites `ots_base64` with the upgraded proof, sets `status` to `"confirmed"`, and records `bitcoin_block_height`. It sets `"confirmed"` only when the upgraded proof actually carries a `BitcoinBlockHeaderAttestation`.
+When `status` is `"pending"`, the `bitcoin_block_height` key is absent. `veriseal anchor upgrade` asks the OpenTimestamps calendars whether the proof has been included in a Bitcoin block; if so, it rewrites `ots_base64` with the upgraded proof, sets `status` to `"confirmed"`, and records `bitcoin_block_height`. It sets `"confirmed"` only when the upgraded proof carries a `BitcoinBlockHeaderAttestation`.
 
 **`"confirmed"` is a claim, not evidence.** It records that a calendar supplied a Bitcoin block-header attestation; the `status` and `bitcoin_block_height` fields are unsigned and anyone can edit them. Before treating the sealed time as established, a verifier MUST check the proof itself against the header of the attested Bitcoin block (the proof's result must equal that header's Merkle root), using block data it does not obtain from the seal's holder. A `pending` or unchecked anchor MUST NOT be presented as a verified timestamp.
 
@@ -216,7 +216,7 @@ If any of these fails, the verdict is TAMPERED. This is the same verdict on ever
 
 ## 8. Signer-key pinning (trust anchoring)
 
-The signature check (step 7) proves only that the manifest was signed by *whoever holds the private key named in the manifest itself*. An attacker who tampers with a log can re-hash it and re-sign it with their own freshly generated key, and step 7 alone will still pass. Authenticity therefore requires pinning the signer's key: comparing the manifest's `signature.public_key` against a key the verifier obtained out-of-band (a fingerprint the sealing party published or handed over separately), not merely trusting the embedded key.
+The signature check (step 7) proves only that the manifest was signed by *whoever holds the private key named in the manifest itself*. An attacker who tampers with a log can re-hash it and re-sign it with their own freshly generated key, and step 7 alone will still pass. Authenticity therefore requires pinning the signer's key: comparing the manifest's `signature.public_key` against a key the verifier obtained out-of-band (a fingerprint the sealing party published or handed over separately).
 
 - `veriseal verify --pubkey <key.pem>` pins the key: the raw 32-byte Ed25519 public key from the manifest must equal the raw key of the supplied PEM, or the verdict is TAMPERED.
 - When no key is pinned, no authenticity to a real-world identity is established. Verifiers MUST NOT present an unpinned pass as fully verified: the CLI reports "INTACT (signer not pinned)" and exits `3`, not `0`, unless the caller passes `--allow-unpinned`; the browser verifiers render a distinct amber/neutral state ("authenticity not established"; pin the signer's key to go green), never a green VERIFIED.

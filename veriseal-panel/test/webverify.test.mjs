@@ -1,11 +1,11 @@
 /**
- * Equivalence test for the STANDALONE web verifier (../../web/verify.html).
+ * Equivalence test for the standalone web verifier (../../web/verify.html).
  *
  * web/verify.html is a single self-contained page (no external requests, no
  * imports), so its verification crypto is a third, independent copy of the same logic in the
- * Python reference and the panel's sealcore.ts. That duplication is by design —
- * but it means the web verifier needs its own regression guard, or a bug fixed
- * in one copy (e.g. the RFC 6962 Merkle split-point) can silently persist here.
+ * Python reference and the panel's sealcore.ts. That duplication is by design, but it means
+ * the web verifier needs its own regression guard, or a bug fixed in one copy (e.g. the
+ * RFC 6962 Merkle split-point) can silently persist here.
  *
  * This test extracts the page's inline <script>, runs it in a sandbox with Node's
  * WebCrypto (mocking only the DOM wiring it performs at load), and exercises the
@@ -65,11 +65,8 @@ vm.runInContext(scriptBody, sandbox);
 check("inline crypto functions are defined", typeof sandbox.recomputeMerkle === "function");
 
 // 3. Large-leaf Merkle equivalence (the same fixture + Python root the panel uses).
-//    Anti-drift guard on the multi-level tree: catches a wrong domain separator,
-//    sort order, or split rule. (Note: within the code's valid domain, n-1 < 2^31,
-//    the old float split and the exact-integer split never actually diverge, so
-//    this does not distinguish those two specifically — it locks the output to the
-//    Python reference against any future change.)
+//    Locks the multi-level tree output to the Python reference, catching a wrong
+//    domain separator, sort order, or split rule.
 const large = JSON.parse(readFileSync(join(here, "fixtures", "large-leaves.json"), "utf8"));
 const largeManifest = sandbox.parseSeal(JSON.stringify({ leaves: large.leaves }));
 const largeRoot = await sandbox.recomputeMerkle(largeManifest);
@@ -83,11 +80,11 @@ check("sample seal Merkle root matches Python-signed root", sampleRoot === EXPEC
 const sig = await sandbox.verifySignature(manifest);
 check("sample seal signature verifies", sig.ok === true);
 
-// 5. Cross-verifier agreement on a NON-MESSAGE byte change (the Commit-1 bug).
-//    Run the page's embedded sample (a real CLI-sealed mcap + seal), then flip a
-//    byte OUTSIDE any message payload (the header region). The file digest must
-//    fail while signature + Merkle still pass — so the web verifier's verdict is
-//    TAMPERED, exactly as `veriseal verify` now reports (source_ok gates both).
+// 5. Cross-verifier agreement on a non-message byte change. Run the page's embedded
+// sample (a real CLI-sealed mcap + seal), then flip a byte outside any message
+// payload (the header region). The file digest must fail while signature + Merkle
+// still pass, so the web verifier's verdict is TAMPERED, as `veriseal verify`
+// reports (source_ok gates both).
 const secondOpen = html.indexOf("<script>", close);
 const secondClose = html.indexOf("</script>", secondOpen);
 const sampleBody = html.slice(secondOpen + "<script>".length, secondClose);
@@ -115,7 +112,7 @@ const altered = mcap.slice();
 altered[40] ^= 0xff;
 const alteredFileOk = await fileOk(altered);
 // Merkle recompute reads manifest.leaves, so it (and the signature) are
-// unchanged by a file-byte flip — only the whole-file digest moves.
+// unchanged by a file-byte flip; only the whole-file digest moves.
 check("non-message flip: file digest FAILS", alteredFileOk === false);
 check("non-message flip: signature + merkle still pass", sigOk && rootOk);
 check(

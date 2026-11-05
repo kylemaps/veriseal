@@ -88,7 +88,7 @@ exits 3 instead of 0.
 ## Notes
 
 - These snippets seal the finished file, so the sealed bytes are the final recording.
-- `veriseal seal` submits the Merkle root to OpenTimestamps by default, which needs network
+- `veriseal seal` submits the manifest's digest to OpenTimestamps by default, which needs network
   access; add `--no-anchor` on offline or air-gapped rigs. An anchored seal starts out pending:
   run [`veriseal anchor upgrade`](../README.md#opentimestamps-anchor) a few hours later to fetch
   its Bitcoin attestation.

@@ -1,4 +1,4 @@
-"""Hermetic tests for `veriseal anchor upgrade` (no network — anchor.upgrade mocked)."""
+"""Hermetic tests for `veriseal anchor upgrade` (no network: anchor.upgrade is mocked)."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from veriseal.canonical import canonical_json
 from veriseal.seal import seal
 from veriseal.verify import verify_seal
 
-# ── helpers ──────────────────────────────────────────────────────────────────
+# helpers
 
 
 def _pending_ots(digest: bytes) -> bytes:
@@ -89,7 +89,7 @@ def _anchor_digest(manifest: dict) -> bytes:
     return hashlib.sha256(canonical_json(payload)).digest()
 
 
-# ── status: none ─────────────────────────────────────────────────────────────
+# status: none
 
 
 def test_upgrade_none_when_no_anchor(mcap_path: Path, tmp_path: Path) -> None:
@@ -107,7 +107,7 @@ def test_upgrade_none_when_no_anchor(mcap_path: Path, tmp_path: Path) -> None:
     assert changed is False
 
 
-# ── status: pending (no new attestation) ─────────────────────────────────────
+# status: pending (no new attestation)
 
 
 def test_upgrade_pending_unchanged(anchored_seal: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -120,7 +120,7 @@ def test_upgrade_pending_unchanged(anchored_seal: Path, monkeypatch: pytest.Monk
     assert changed is False
 
 
-# ── status: confirmed ────────────────────────────────────────────────────────
+# status: confirmed
 
 
 def test_upgrade_confirmed_updates_manifest(
@@ -141,7 +141,7 @@ def test_upgrade_confirmed_updates_manifest(
 def test_upgrade_confirmed_preserves_signature(
     mcap_path: Path, anchored_seal: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Writing back a confirmed anchor must NOT invalidate the manifest signature
+    """Writing back a confirmed anchor must not invalidate the manifest signature
     (the anchor block is excluded from the signed payload)."""
     manifest = json.loads(anchored_seal.read_bytes())
     digest = _anchor_digest(manifest)
@@ -169,7 +169,7 @@ def test_upgrade_confirmed_is_idempotent(
     assert changed is False
 
 
-# ── status: mismatch (proof commits to a different manifest) ──────────────────
+# status: mismatch (proof commits to a different manifest)
 
 
 def test_upgrade_mismatch_does_not_touch_manifest(
@@ -186,7 +186,7 @@ def test_upgrade_mismatch_does_not_touch_manifest(
     assert manifest == before  # untouched
 
 
-# ── CLI plumbing ─────────────────────────────────────────────────────────────
+# CLI plumbing
 
 
 def test_cli_anchor_upgrade_none_exit0(mcap_path: Path, tmp_path: Path) -> None:

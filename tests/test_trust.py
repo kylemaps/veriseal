@@ -16,7 +16,7 @@ from veriseal.seal import seal
 from veriseal.signing import generate_key, public_pem
 from veriseal.verify import verify_seal
 
-# ── shared fixture ───────────────────────────────────────────────────────────
+# shared fixture
 
 
 def _write_mcap(path: Path, messages: list[tuple[str, int, bytes]]) -> Path:
@@ -48,7 +48,7 @@ def sealed_pair(tmp_path: Path) -> tuple[Path, Path]:
     return mcap, seal_path
 
 
-# ── --pubkey tests ───────────────────────────────────────────────────────────
+# --pubkey tests
 
 
 def test_pubkey_correct_key_passes(sealed_pair: tuple[Path, Path], tmp_path: Path) -> None:
@@ -86,7 +86,7 @@ def test_pubkey_non_ed25519_returns_2(sealed_pair: tuple[Path, Path], tmp_path: 
     assert verify_seal(mcap, seal_path, pubkey_path=rsa_pub_path) == 2
 
 
-# ── unpinned verify: exit 3 unless --allow-unpinned ──────────────────────────
+# unpinned verify: exit 3 unless --allow-unpinned
 
 
 def _out(capsys: pytest.CaptureFixture[str]) -> str:
@@ -148,7 +148,7 @@ def test_cli_exit_codes_for_pinning(sealed_pair: tuple[Path, Path], tmp_path: Pa
     assert "signer not pinned" in " ".join(packed.stdout.split())
 
 
-# ── --require-anchor tests ───────────────────────────────────────────────────
+# --require-anchor tests
 
 
 def test_require_anchor_fails_on_null_anchor(sealed_pair: tuple[Path, Path]) -> None:
@@ -203,7 +203,7 @@ def test_require_anchor_fails_on_pending_anchor(
     assert result == 1
 
 
-# ── canonical_json correctness ───────────────────────────────────────────────
+# canonical_json correctness
 
 
 def test_canonical_json_rejects_nan() -> None:
@@ -216,7 +216,7 @@ def test_canonical_json_rejects_inf() -> None:
         canonical_json({"x": float("inf")})
 
 
-# ── signing key type guards ──────────────────────────────────────────────────
+# signing key type guards
 
 
 def test_load_private_pem_rejects_non_ed25519(tmp_path: Path) -> None:

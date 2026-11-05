@@ -1,11 +1,11 @@
 """The re-seal-with-attacker-key attack, and why key pinning is the only defense.
 
 An attacker who can modify a log can also re-hash it and re-sign it with their
-OWN freshly generated key. Verifying that tampered log against the attacker's own
-new seal returns INTACT — the signature is self-consistent. This is not a bug;
-it is the reason authenticity REQUIRES pinning the original signer's key
-(out-of-band). These tests document the limitation and prove the pin closes it,
-mirroring web/verify.html and the Foxglove panel (SPEC-manifest.md 8).
+own freshly generated key. Verifying that tampered log against the attacker's own
+new seal returns INTACT, because the signature is self-consistent. Authenticity
+therefore requires pinning the original signer's key (out-of-band). These tests
+document the limitation and prove the pin closes it, mirroring web/verify.html and
+the Foxglove panel (SPEC-manifest.md 8).
 """
 
 from __future__ import annotations
@@ -54,7 +54,7 @@ def test_reseal_with_attacker_key(tmp_path: Path) -> None:
     real_pub = tmp_path / "real.pub.pem"
     real_pub.write_text(json.loads(genuine_seal.read_bytes())["signature"]["public_key"])
 
-    # 2. Attacker tampers the log and re-seals with a FRESH key (key2), producing
+    # 2. Attacker tampers the log and re-seals with a fresh key (key2), producing
     #    a fully self-consistent seal signed by a key they control.
     tampered = _write_mcap(tmp_path / "tampered.mcap", _TAMPERED)
     attacker_seal = tmp_path / "tampered.seal.json"
@@ -76,7 +76,7 @@ def test_reseal_with_attacker_key(tmp_path: Path) -> None:
     assert verify_seal(tampered, attacker_seal) == 3
     assert verify_seal(tampered, attacker_seal, allow_unpinned=True) == 0
 
-    # 4. Pinning the ORIGINAL signer's key catches it: the manifest was signed by
+    # 4. Pinning the original signer's key catches it: the manifest was signed by
     #    a different (attacker) key -> exit 1.
     assert verify_seal(tampered, attacker_seal, pubkey_path=real_pub) == 1
 

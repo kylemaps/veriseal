@@ -17,7 +17,7 @@ from veriseal.verify import verify_seal
 rosbags = pytest.importorskip("rosbags")
 
 
-# ── helpers ──────────────────────────────────────────────────────────────────
+# helpers
 
 
 def _write_bag(path: Path, messages: list[tuple[str, int, str]]) -> Path:
@@ -48,7 +48,7 @@ _MESSAGES = [
 ]
 
 
-# ── format detection ─────────────────────────────────────────────────────────
+# format detection
 
 
 def test_detect_format() -> None:
@@ -62,7 +62,7 @@ def test_detect_format_unknown_raises() -> None:
         detect_format(Path("log.txt"))
 
 
-# ── seal + verify a .bag directly ─────────────────────────────────────────────
+# seal + verify a .bag directly
 
 
 def test_seal_bag_records_format(tmp_path: Path) -> None:

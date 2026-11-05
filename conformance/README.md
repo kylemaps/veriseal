@@ -31,9 +31,8 @@ source.size     4563 bytes
 merkle.root     9a75174f04a956e947427887468f63381b3914cafbc3f83b052620a2bc04a581
 ```
 
-This manifest is also the cross-core anchor for the whole project: it is byte-identical
-to `veriseal-panel/test/fixtures/sample.seal.json`, and its root is the constant both
-JavaScript verifier cores are pinned to. If your implementation reproduces
+This manifest is byte-identical to `veriseal-panel/test/fixtures/sample.seal.json`, and both
+JavaScript verifiers test against its root. If your implementation reproduces
 `9a75174f…` from these leaves, your canonical JSON, leaf preimage, leaf hash, sort
 order, and RFC 6962 tree all agree with the reference.
 
@@ -61,8 +60,8 @@ must name the message that changed.
 
 ### `sample.bag`: the ROS 1 and key-pinning vector
 
-The same 10 messages in a ROS 1 bag, proving the leaf triples
-`(topic, log_time, payload)` are container-agnostic (SPEC §2).
+The same 10 messages in a ROS 1 bag. The leaf triples `(topic, log_time, payload)` do not
+depend on the container (SPEC §2).
 
 ```
 source.format   rosbag1

@@ -34,7 +34,7 @@ def merkle_root(leaf_hashes: list[bytes]) -> bytes:
     """
     Recursive Merkle Tree Hash per RFC 6962 §2.1.
 
-    Inputs are ALREADY leaf hashes (computed with the 0x00-prefix domain separator).
+    Inputs are already leaf hashes (computed with the 0x00-prefix domain separator).
 
       MTH([])   = SHA-256(b"")
       MTH([h])  = h                               (leaf already hashed)
