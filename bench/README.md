@@ -33,12 +33,13 @@ the system:
 git clone https://github.com/kylemaps/veriseal && cd veriseal
 uv venv --python 3.12 && source .venv/bin/activate     # or: python3 -m venv .venv
 uv pip install ".[ros1]"                               # or: pip install ".[ros1]"
-python bench/measure.py /path/to/log.mcap /path/to/other.bag --runs 5 --battery-wh 1200
+python bench/measure.py /path/to/log.mcap /path/to/other.bag --runs 5 --battery-wh 720
 ```
 
 - Give `.mcap` files, ROS 1 `.bag` files, or ROS 2 bag folders recorded with `--storage mcap`.
-- `--battery-wh` is the robot's battery capacity; with it, the results also give sealing's share
-  of the battery per hour of recording.
+- `--battery-wh` is your robot's battery capacity (720 is a Husarion Panther's standard battery,
+  so change it to match yours); with it, the results also give sealing's share of the battery per
+  hour of recording.
 - On an Intel computer such as a NUC, the energy counter is readable only by root. Run the
   script with the environment's own Python, `sudo .venv/bin/python bench/measure.py ...`,
   because a plain `sudo python` skips the environment.
