@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 import pytest
 from typer.testing import CliRunner
 
@@ -21,8 +23,9 @@ def test_version_flag_prints_the_version(flag):
 def test_help_still_lists_the_commands():
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    assert "--version" in result.output
-    assert "seal" in result.output
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", result.output)  # colour codes can split an option
+    assert "--version" in plain
+    assert "seal" in plain
 
 
 def test_bare_command_still_shows_help():
