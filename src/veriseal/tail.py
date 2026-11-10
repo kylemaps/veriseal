@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import signal
 import sys
 import threading
@@ -47,6 +48,8 @@ from veriseal.canonical import canonical_json
 from veriseal.formats import iter_messages
 from veriseal.signing import generate_key, load_private_pem, public_pem
 from veriseal.stream import (
+    MAX_LAG_NS,
+    SEALED_TOO_LATE,
     Message,
     Segment,
     StreamResult,
@@ -143,6 +146,80 @@ class McapTail:
                 messages.append((topic, record.log_time, bytes(record.data)))
 
 
+def next_split(path: Path) -> Path | None:
+    """The file a recorder writes after *path* when it splits a recording.
+
+    ``ros2 bag record`` numbers them ``name_0.mcap``, ``name_1.mcap`` and so on.
+    """
+    match = re.fullmatch(r"(.*_)(\d+)", path.stem)
+    if not match:
+        return None
+    return path.with_name(f"{match[1]}{int(match[2]) + 1}{path.suffix}")
+
+
+def split_files(path: Path) -> list[Path]:
+    """*path* and every later file of the same recording that exists."""
+    files = [path]
+    while (following := next_split(files[-1])) and following.exists():
+        files.append(following)
+    return files
+
+
+class SplitTail:
+    """Follows a recording across the files the recorder splits it into.
+
+    When a file ends, the recorder may be about to open the next one, so the recording counts
+    as over only once *wait_s* has passed without a next file appearing.
+    """
+
+    def __init__(
+        self, path: Path, wait_s: float = 2.0, clock: Callable[[], float] = time.monotonic
+    ) -> None:
+        self.path = path
+        self.done = False
+        self.files = 1
+        self._tail = McapTail(path)
+        self._wait_s = wait_s
+        self._clock = clock
+        self._ended_at: float | None = None
+        self._bytes = self._chunks = 0
+
+    @property
+    def bytes_read(self) -> int:
+        return self._bytes + self._tail.bytes_read
+
+    @property
+    def chunks(self) -> int:
+        return self._chunks + self._tail.chunks
+
+    def close(self) -> None:
+        self._tail.close()
+
+    def poll(self) -> list[Message]:
+        """Return the messages the recorder has finished writing since the last call."""
+        if self.done:
+            return []
+        messages = self._tail.poll()
+        while self._tail.done:
+            following = next_split(self._tail.path)
+            if following is None:
+                self.done = True
+                break
+            if not following.exists():
+                if self._ended_at is None:
+                    self._ended_at = self._clock()
+                self.done = self._clock() - self._ended_at >= self._wait_s
+                break
+            self._bytes += self._tail.bytes_read
+            self._chunks += self._tail.chunks
+            self._tail.close()
+            self._tail = McapTail(following)
+            self._ended_at = None
+            self.files += 1
+            messages += self._tail.poll()
+        return messages
+
+
 def _percentiles(values_ns: list[int]) -> dict:
     if not values_ns:
         return {}
@@ -176,6 +253,7 @@ class TailStats:
     polls: int = 0
     bytes_read: int = 0
     chunks: int = 0
+    files: int = 1
     cpu_s: float = 0.0
     wall_s: float = 0.0
     read_delays_ns: list[int] = field(default_factory=list)
@@ -190,6 +268,7 @@ class TailStats:
             "polls": self.polls,
             "bytes_read": self.bytes_read,
             "chunks": self.chunks,
+            "files": self.files,
             "cpu_s": round(self.cpu_s, 3),
             "wall_s": round(self.wall_s, 3),
             "read_delay": _percentiles(self.read_delays_ns),
@@ -198,7 +277,7 @@ class TailStats:
 
 
 def seal_growing_log(
-    tail: McapTail,
+    tail: McapTail | SplitTail,
     sealer: StreamSealer,
     *,
     clock: Callable[[], int] = time.time_ns,
@@ -259,6 +338,7 @@ def seal_growing_log(
             break
         sleep(poll_s)
     stats.bytes_read, stats.chunks = tail.bytes_read, tail.chunks
+    stats.files = getattr(tail, "files", 1)
     stats.cpu_s = time.process_time() - began_cpu
     stats.wall_s = time.perf_counter() - began_wall
     return stats
@@ -329,7 +409,7 @@ def _seal(args: argparse.Namespace) -> int:
             reorder_ns=int(args.reorder_ms * 1_000_000),
             grace_ns=int(args.grace_seconds * SECOND),
         )
-        tail = McapTail(args.log)
+        tail = SplitTail(args.log, wait_s=args.split_wait_seconds)
         print(f"ready: sealing {args.log}", flush=True)
         try:
             stats = seal_growing_log(
@@ -351,6 +431,7 @@ def _seal(args: argparse.Namespace) -> int:
         "grace_s": args.grace_seconds,
         "reorder_ms": args.reorder_ms,
         "poll_ms": args.poll_ms,
+        "split_wait_s": args.split_wait_seconds,
     }
     if client:
         summary["deliveries"] = [
@@ -370,8 +451,20 @@ def _seal(args: argparse.Namespace) -> int:
     return 0
 
 
-def check_sealed(log: Path, folder: Path) -> StreamResult:
+def _read_finished(log: Path) -> list[Message]:
+    try:
+        return list(iter_messages(log))
+    except Exception:  # noqa: BLE001 - a file cut short has no summary for the standard reader
+        tail = McapTail(log)
+        messages = tail.poll()
+        tail.close()
+        return messages
+
+
+def check_sealed(log: Path, folder: Path, max_lag_ns: int | None = MAX_LAG_NS) -> StreamResult:
     """Verify a log against a folder written by ``seal``.
+
+    *log* is the recording's first file. Later files of a split recording are read with it.
 
     This trusts the identity key and start record in the folder. The real check takes both
     from the chain.
@@ -380,12 +473,7 @@ def check_sealed(log: Path, folder: Path) -> StreamResult:
     keys = json.loads((folder / "keys.json").read_text())
     leaves_path = folder / "leaves.bin"
     leaves = read_leaves(leaves_path) if leaves_path.exists() else None
-    try:
-        messages = list(iter_messages(log))
-    except Exception:  # noqa: BLE001 - a file cut short has no summary for the standard reader
-        tail = McapTail(log)
-        messages = tail.poll()
-        tail.close()
+    messages = [message for part in split_files(log) for message in _read_finished(part)]
     segment = Segment(
         record,
         [bytes.fromhex(key) for key in keys["public_keys"]],
@@ -394,19 +482,39 @@ def check_sealed(log: Path, folder: Path) -> StreamResult:
         leaves,
     )
     return verify_task(
-        [segment], record["task_id"], record["block_hash"], keys["identity"], [start_hash(record)]
+        [segment],
+        record["task_id"],
+        record["block_hash"],
+        keys["identity"],
+        [start_hash(record)],
+        max_lag_ns=max_lag_ns,
     )
 
 
+EXIT_OK, EXIT_FAILED, EXIT_LATE = 0, 1, 2
+
+
 def _verify(args: argparse.Namespace) -> int:
-    result = check_sealed(args.log, args.out_dir)
+    """Print the verdict. Exit 0: the log matches. 1: it does not. 2: it matches, sealed late."""
+    limit_ns = int(args.max_lag_ms * 1_000_000)
+    result = check_sealed(args.log, args.out_dir, limit_ns)
     if result.ok:
         late = f"{result.late_messages} late, up to {result.max_late_ns / 1e6:.1f} ms"
         print(f"OK: {result.reason}; {late}")
-    else:
-        where = f"epoch {result.epoch}, message {result.message_index}"
-        print(f"FAILED: {result.reason} ({where})")
-    return 0 if result.ok else 1
+        return EXIT_OK
+    if result.reason == SEALED_TOO_LATE:
+        unbounded = check_sealed(args.log, args.out_dir, None)
+        if unbounded.ok:
+            print(
+                f"LATE: the log matches every head, but {unbounded.late_messages} messages "
+                f"were sealed up to {unbounded.max_late_ns / 1e9:.1f} s after their times "
+                f"(limit {args.max_lag_ms:g} ms). A recorder that paused looks like this, and "
+                "so does a message added afterwards with an earlier time."
+            )
+            return EXIT_LATE
+    where = f"epoch {result.epoch}, message {result.message_index}"
+    print(f"FAILED: {result.reason} ({where})")
+    return EXIT_FAILED
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -429,6 +537,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     seal.add_argument("--poll-ms", type=float, default=50.0)
     seal.add_argument("--idle-seconds", type=float, help="give up after this long without data")
+    seal.add_argument(
+        "--split-wait-seconds",
+        type=float,
+        default=2.0,
+        help="how long to wait for the recorder's next file after one ends",
+    )
     seal.add_argument("--max-seconds", type=float, default=7200.0, help="longest task to expect")
     seal.add_argument("--task", default="dry-run")
     seal.add_argument("--executor", default="dry-run")
@@ -442,6 +556,12 @@ def main(argv: list[str] | None = None) -> int:
     check = commands.add_parser("verify", help="verify a finished log against its seal")
     check.add_argument("log", type=Path)
     check.add_argument("--out-dir", type=Path, required=True)
+    check.add_argument(
+        "--max-lag-ms",
+        type=float,
+        default=MAX_LAG_NS / 1_000_000,
+        help="how long after its time a message may have been sealed",
+    )
     args = parser.parse_args(argv)
     if args.command == "seal" and args.witness and not args.witness_pub:
         parser.error("--witness needs --witness-pub")

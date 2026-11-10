@@ -491,7 +491,7 @@ def check_log(
     heads: list[dict],
     leaves: list[bytes] | None = None,
     allow_tail: bool = False,
-    max_lag_ns: int = MAX_LAG_NS,
+    max_lag_ns: int | None = MAX_LAG_NS,
 ) -> StreamResult:
     """Rebuild every epoch from the log and compare it with that epoch's head.
 
@@ -501,7 +501,9 @@ def check_log(
     A late message may be stamped at most *max_lag_ns* before the start of the epoch that
     sealed it. Without this bound, a hacker could add messages after the hack stamped with
     times from before it, and a replay in time order would show them as part of the protected
-    past.
+    past. With *max_lag_ns* set to None the bound is not applied, and ``max_late_ns`` in the
+    result says how late the latest message was. That separates a log that matches its heads
+    but was sealed late, as after a recorder stall, from one that does not match them.
 
     With *allow_tail*, messages after the last head are counted instead of rejected. A recording
     cut short by a power loss ends this way, and no head protects those messages.
@@ -523,7 +525,7 @@ def check_log(
             begins = origin_ns + epoch * epoch_ns
             if log_time_ns >= begins:
                 return StreamResult(False, "a message's time does not fit its epoch", epoch, index)
-            if log_time_ns < begins - max_lag_ns:
+            if max_lag_ns is not None and log_time_ns < begins - max_lag_ns:
                 # Signed, but too long after its time to count as recorded then. A recorder
                 # that stalled past the sealer's grace ends here too, so it has its own reason.
                 return StreamResult(False, SEALED_TOO_LATE, epoch, index)
@@ -679,7 +681,7 @@ def verify_task(
     published: list[str],
     not_before_ns: int | None = None,
     published_at_ns: list[int] | None = None,
-    max_lag_ns: int = MAX_LAG_NS,
+    max_lag_ns: int | None = MAX_LAG_NS,
 ) -> StreamResult:
     """Check a whole task against the start records published on-chain, in order.
 
@@ -706,6 +708,7 @@ def verify_task(
         return StreamResult(False, "a start record has no publication time")
     interrupted: list[int] = []
     seams: list[int] = []
+    overlap_ns = MAX_LAG_NS if max_lag_ns is None else max_lag_ns
     unprotected = late = most_late = 0
     ended_ns: int | None = None
     for index, segment in enumerate(segments):
@@ -718,7 +721,7 @@ def verify_task(
             reason = "a message is older than its start record"
             return StreamResult(False, reason, segment=index)
         if times and ended_ns is not None:
-            if min(times) < ended_ns - max_lag_ns:
+            if min(times) < ended_ns - overlap_ns:
                 return StreamResult(False, "segments overlap in time", segment=index)
             seams.append(min(times) - ended_ns)
         if times:
