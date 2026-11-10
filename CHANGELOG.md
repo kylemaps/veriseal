@@ -16,6 +16,10 @@
 - `python -m veriseal.tail seal|verify`: seals a recorder's MCAP file as it grows, and checks the result.
 - `python -m veriseal.witness`: a small HTTP witness that stores each head it is sent and returns a signed receipt.
 - `bench/`: `window.py` (how long a change could go unnoticed), `attacks.py` (attack table against the real verifiers), `memory_dump.py` (are erased keys gone from memory), `live_replay.py` (cost of sealing beside the ROS 2 recorder) and `ros2_replay/` (Docker harness). `bench/RUNS.md` is a step-by-step runbook.
+- `python -m veriseal.tail` follows a recording the recorder splits into several files (`name_0.mcap`, `name_1.mcap`, ...). `verify` exits `2` and prints LATE when the log matches every head but some messages were sealed longer after their times than `--max-lag-ms` allows.
+- `SPEC-stream.md`: draft specification of the streaming seal.
+- `bench/`: `window.py --head-delay`, `plot_window.py` (SVG chart of the windows), two baseline columns in `attacks.py`, and `chain_baseline.py` with `measure.py --chain-baseline`.
+- `CONTRIBUTING.md` and `SECURITY.md`.
 - `veriseal --version`.
 - `--key-passphrase-env VAR`: `keygen` encrypts the new key with the passphrase in environment variable `VAR`, and `seal` uses it to decrypt the key.
 

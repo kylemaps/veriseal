@@ -196,6 +196,25 @@ veriseal pack log.mcap log.seal.json --out incident-pack --zip    # a single .zi
 
 The pack is evidence infrastructure, not a compliance certificate: it supports disclosure obligations under things like the EU Product Liability Directive (2024/2853) or AI Act Article 73 by making a log's integrity independently checkable, but it never asserts the log's *contents* are true, and it never claims to satisfy any regulation on its own.
 
+### Streaming seal (experimental)
+
+`veriseal seal` signs a finished log, so everything before that moment rests on the computer staying honest until then. The streaming seal signs while the log is being recorded: once per second it signs a head with a key that is then erased, and it can send each head to a witness on another machine. Someone who takes over the recorder later cannot re-sign the earlier seconds.
+
+```bash
+# on another machine: keep each head and sign a receipt for it
+python -m veriseal.witness --key witness.key.pem --store witness.jsonl --host 0.0.0.0 --port 8787
+
+# beside the recorder: follow its MCAP file as it grows
+ros2 bag record -s mcap --storage-preset-profile fastwrite -o task /topics ...
+python -m veriseal.tail seal task/task_0.mcap --out-dir sealed \
+    --witness http://WITNESS:8787 --witness-pub witness.pub.pem
+
+# afterwards: exit 0 = matches, 1 = does not, 2 = matches but sealed late
+python -m veriseal.tail verify task/task_0.mcap --out-dir sealed
+```
+
+The sealer follows a recording that the recorder splits into several files, and the seal stays valid when the file is rewritten in another order or compression. The format is specified in [SPEC-stream.md](https://github.com/kylemaps/veriseal/blob/main/SPEC-stream.md). It is a draft and can change; it is not part of the `veriseal` command yet. [`bench/`](https://github.com/kylemaps/veriseal/tree/main/bench) holds the tools that measure its cost and test it against attacks.
+
 ## Threat model
 
 A seal proves that this log matches a seal made by key K at time T. Anyone can check that independently, provided two things hold: the verifier knows and pins the signer's public key (`--pubkey`), and the anchor has been checked against Bitcoin (`--check-bitcoin`). Without `--pubkey`, a tampered log re-sealed with a fresh key still passes. Without a checked anchor, the time rests only on what the sealer (or the calendar) says.
@@ -236,6 +255,10 @@ inspect  filter MCAP to time window → print chronological event timeline →
 - **v0.1:** seal / verify / inspect / pack on MCAP + OpenTimestamps anchor; independent web verifier; Foxglove panel
 - **v0.2:** chain-of-custody log; RFC 3161 + Sigstore/Rekor option; ROS 2 SQLite (`.db3`) bag ingest; HTML report
 - **v0.3:** web viewer; sealing daemon; pluggable transparency-log backend
+
+## Contributing
+
+See [CONTRIBUTING.md](https://github.com/kylemaps/veriseal/blob/main/CONTRIBUTING.md). Report security problems privately, as described in [SECURITY.md](https://github.com/kylemaps/veriseal/blob/main/SECURITY.md).
 
 ## License
 
