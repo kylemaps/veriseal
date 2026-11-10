@@ -8,6 +8,8 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
+from veriseal import __version__
+
 app = typer.Typer(
     name="veriseal",
     help="Tamper-evident incident packages for robot/autonomy logs.",
@@ -19,6 +21,28 @@ anchor_app = typer.Typer(
 )
 app.add_typer(anchor_app, name="anchor")
 console = Console()
+
+
+def _show_version(value: bool) -> None:
+    if value:
+        console.print(f"veriseal {__version__}", highlight=False)
+        raise typer.Exit()
+
+
+@app.callback()
+def _options(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        "-V",
+        "-v",
+        callback=_show_version,
+        is_eager=True,
+        help="Show the version and exit.",
+    ),
+) -> None:
+    pass
+
 
 _PASSPHRASE_HELP = (
     "Read the signer key's passphrase from environment variable VAR, not the command line "
