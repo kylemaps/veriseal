@@ -49,3 +49,60 @@ python bench/measure.py /path/to/log.mcap /path/to/other.bag --runs 5 --battery-
 It writes `veriseal-measurements.json`. The file holds timings, file sizes, message counts and
 a description of the computer (model, CPU, memory, OS), but nothing from inside the logs. The
 logs are only read; seals go to a temporary folder that is deleted afterwards.
+
+## The streaming prototype
+
+More scripts cover the checkpoint design. None needs a robot.
+
+`bench/window.py` works out how much of a log a hacked robot could still change or remove, for each export interval. To measure a real link, start a witness on another machine, then run the script in real time against it:
+
+```bash
+python -m veriseal.witness --store witness.jsonl --host 0.0.0.0 --port 8787
+python bench/window.py --url http://WITNESS:8787 --witness-pub witness.pub.pem --live \
+    --task 600 --epoch 1 --export 1,10,60 --out window.json
+```
+
+The witness prints its public key when it starts: save that as `witness.pub.pem`. It has no login, so keep it on a private network.
+
+`bench/attacks.py` runs each attack against each design with the real verifiers, and prints any result that differs from the expected one:
+
+```bash
+python bench/attacks.py --log task.mcap --out attacks.json
+```
+
+`bench/memory_dump.py` checks whether erased epoch keys are still in the recorder's memory. A child process closes 20 epochs, then the script reads the child's memory and counts the erased seeds and private keys it can still find. It runs on Linux (the NUC and the Pi) and Windows, needs no `sudo`, and reads nothing from any log:
+
+```bash
+python bench/memory_dump.py --runs 10 --out memory.json
+```
+
+`bench/tail_dry_run.py` tests the sealer that reads the recorder's file as it grows (`python -m veriseal.tail`). The script plays the recorder: it writes a recorded task into a new MCAP file in real time while the sealer runs, then verifies the file and reports how far behind the recorder the sealer ran. `--chunk-kib 0` writes the file without chunks:
+
+```bash
+python bench/tail_dry_run.py task.bag --chunk-kib 768 --out tail-768k.json
+python bench/tail_dry_run.py task.bag --chunk-kib 0 --out tail-nochunk.json
+```
+
+`bench/ros2_replay/` runs the same test through the real ROS 2 recorder, in Docker, so it needs no robot either. Convert the task to a ROS 2 bag first (`--dst-version 5` suits Humble; add `--exclude-msgtype` for any message type that only exists in ROS 1), build the image, then run one replay per recorder setting. The arguments after the name are the grace period in seconds and any options for `ros2 bag record`:
+
+```bash
+rosbags-convert --src task.bag --dst work/ros2bag --dst-storage mcap --dst-version 5
+docker build -t veriseal-ros2-humble bench/ros2_replay
+docker run --rm -v "$PWD:/src:ro" -v "$PWD/work:/work" veriseal-ros2-humble \
+    bash /src/bench/ros2_replay/replay.sh fastwrite 6 --storage-preset-profile fastwrite
+```
+
+Each run leaves `work/runs/NAME/report.json`: the messages played, recorded and sealed, the verify result, the recorder's chunks, and how far behind the sealer ran. `NOSEAL=1` records without the sealer, as a baseline for dropped messages, and `CONVERT=1` also checks the seal after `ros2 bag convert`.
+
+## On the robot: the live replay
+
+`bench/live_replay.py` is the same test on a computer with ROS 2 installed, the NUC in our case, and it measures energy as well. It replays a recorded task (a ROS 2 bag folder of MCAP files) through the real recorder in three setups that take turns: recording alone (A), recording and sealing (B), and recording, sealing and sending each head to a witness (C). Every run is measured over the same fixed time, so the differences in energy between setups are what sealing and sending cost:
+
+```bash
+source /opt/ros/humble/setup.bash
+sudo chmod a+r /sys/class/powercap/intel-rapl:0/energy_uj   # once per boot, for the energy counter
+python bench/live_replay.py TASK_BAG --out live.json \
+    --witness http://WITNESS:8787 --witness-pub witness.pub.pem
+```
+
+The default is 25 rounds of all three setups, about 1 h 50 min for a 65 s task. Each run also reports the messages the recorder dropped, how far behind the recorder the sealer ran, whether the result verifies, and how long each head took to reach the witness. Recordings are deleted after each run.
