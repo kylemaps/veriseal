@@ -144,3 +144,31 @@ def test_stream_mode_reports_checkpoints(tmp_path: Path) -> None:
     assert stream[1]["heads"] > stream[0]["heads"] >= 1
     assert stream[0]["leaves_bytes"] == 32 * 198
     assert stream[0]["seal"]["wall_s"] > 0
+
+
+def test_chain_baseline_is_timed_beside_the_stream(tmp_path: Path) -> None:
+    make_sample = _load("make_sample", REPO / "demo" / "make_sample.py")
+    log = tmp_path / "log.mcap"
+    make_sample.write_sample(log)
+    out = tmp_path / "results.json"
+    args = [str(log), "--runs", "1", "--idle-seconds", "0", "--power", "none", "--out", str(out)]
+    measure.measure(args + ["--stream", "1", "--chain-baseline"])
+    entry = json.loads(out.read_text(encoding="utf-8"))["logs"][0]
+    (chain,) = entry["chain_baseline"]
+    assert chain["epoch_s"] == 1.0 and chain["seal"]["wall_s"] > 0
+    assert chain["checkpoints"] > entry["stream"][0]["heads"]  # one per topic, not one per epoch
+
+
+def test_chain_baseline_links_depend_on_every_earlier_message() -> None:
+    baseline = _load("chain_baseline", REPO / "bench" / "chain_baseline.py")
+    messages = [(f"/t{i % 2}", i * 250_000_000, bytes([i])) for i in range(12)]
+
+    def links(log):
+        made = baseline.chain_checkpoints(log, 1_000_000_000, b"k" * 32, lambda m: b"")
+        return {(c["topic"], c["epoch"]): (c["count"], c["link"]) for c in made}
+
+    honest = links(messages)
+    assert set(honest) == {(t, e) for t in ("/t0", "/t1") for e in range(3)}
+    assert honest[("/t0", 2)][0] == 6
+    changed = links([messages[0][:2] + (b"x",)] + messages[1:])
+    assert [key for key in honest if honest[key] != changed[key]] == [("/t0", e) for e in range(3)]

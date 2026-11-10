@@ -70,11 +70,13 @@ A sealer that follows the recorder's file signs each head a little after its epo
 python bench/plot_window.py window-wifi.json window-lte.json --out window.svg
 ```
 
-`bench/attacks.py` runs each attack against each design with the real verifiers, and prints any result that differs from the expected one:
+`bench/attacks.py` runs each attack against each design with the real verifiers, and prints any result that differs from the expected one. The last two columns model the earlier approach of one long-lived key with every checkpoint sent out, without and with a key held in trusted hardware:
 
 ```bash
 python bench/attacks.py --log task.mcap --out attacks.json
 ```
+
+`bench/chain_baseline.py` is a cost baseline: a keyed hash chain per topic with a signed checkpoint per topic per interval, the checkpoint structure of Black Block Recorder (White et al., IEEE RA-L 2019), written from the paper's description. `bench/measure.py --stream 60,10,1 --chain-baseline` times it beside the streaming seal on the same logs.
 
 `bench/memory_dump.py` checks whether erased epoch keys are still in the recorder's memory. A child process closes 20 epochs, then the script reads the child's memory and counts the erased seeds and private keys it can still find. It runs on Linux (the NUC and the Pi) and Windows, needs no `sudo`, and reads nothing from any log:
 

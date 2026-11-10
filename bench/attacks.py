@@ -28,7 +28,7 @@ import io
 import json
 import tempfile
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from mcap.writer import Writer
@@ -74,6 +74,37 @@ CONFIGS = (
     "one key + witness",
     "throw-away keys + witness",
     "throw-away keys + timed restarts",
+    "one key, every head sent",
+    "sealed key, every head sent",
+)
+
+
+@dataclass(frozen=True)
+class Design:
+    """One column of the table after the end seal.
+
+    *erased*: throw-away keys. *exported*: heads go to a witness, one in every *export_every*.
+    *timed*: start records are timed. *sealed*: the keys sit in hardware the hacker can't read,
+    so the hacker can still feed the recorder but can't sign anything themselves.
+
+    The last two columns model the earlier approach of one long-lived key with every checkpoint
+    sent to a ledger, without and with trusted hardware. They assume the link never drops.
+    """
+
+    erased: bool
+    exported: bool
+    timed: bool = False
+    export_every: int = EXPORT_EVERY
+    sealed: bool = False
+
+
+DESIGNS = (
+    Design(erased=True, exported=False),
+    Design(erased=False, exported=True),
+    Design(erased=True, exported=True),
+    Design(erased=True, exported=False, timed=True),
+    Design(erased=False, exported=True, export_every=1),
+    Design(erased=False, exported=True, export_every=1, sealed=True),
 )
 
 
@@ -115,6 +146,7 @@ class Run:
     published: list[str]
     witnessed: list[dict] = field(default_factory=list)
     timed: bool = False
+    sealed: bool = False
 
 
 def _feed(sealer: StreamSealer, messages: list[Message]) -> list[dict]:
@@ -139,33 +171,31 @@ def _one_key_chain(scenario: Scenario, identity):
     return None, record, public_keys, key_signer(key)
 
 
-def record_until_hack(
-    scenario: Scenario, erased: bool, exported: bool, hack_index: int, timed: bool = False
-) -> Run:
+def record_until_hack(scenario: Scenario, design: Design, hack_index: int) -> Run:
     """Record honestly up to the hack, sending heads to a witness if this design has one.
 
     With *timed*, every start record is timed by the chain or a witness, and the recorder waits
     for that before recording. A restart the hacker publishes is timed at the hack.
     """
     identity = generate_key()
-    if erased:
+    if design.erased:
         _, start, public_keys, signer = _new_chain(scenario, identity, TASK, BLOCK)
     else:
         _, start, public_keys, signer = _one_key_chain(scenario, identity)
     sealer = StreamSealer(TASK, scenario.epoch_ns, signer, start_hash(start))
     heads = _feed(sealer, scenario.messages[:hack_index])
     witnessed = []
-    if exported:
+    if design.exported:
         witness = Witness(generate_key())
         witness.register(start, public_keys)
         for head in heads:
-            if (head["epoch"] + 1) % EXPORT_EVERY == 0:
+            if (head["epoch"] + 1) % design.export_every == 0:
                 witness.submit(head)
         witnessed = witness.heads(start_hash(start))
     published = [start_hash(start)]
     return Run(
         scenario, hack_index, identity, start, public_keys, sealer, signer, heads, published,
-        witnessed, timed,
+        witnessed, design.timed, design.sealed,
     )  # fmt: skip
 
 
@@ -280,6 +310,8 @@ def best_outcome(run: Run, target: list[Message], restamp: bool = True) -> dict:
     for strategy in STRATEGIES:
         if strategy is restamp_after_cut and not restamp:
             continue
+        if run.sealed and strategy is not keep_heads:
+            continue  # every other strategy signs with a key the hacker can't reach
         attempt = strategy(run, target)
         if attempt is None:
             continue
@@ -366,19 +398,67 @@ OLD_PROOF = "submit an old proof for this task"
 BEFORE_START = "hacked before the start record left"
 
 EXPECTED: dict[str, tuple[str, ...]] = {
-    "no attack": (PASSES, PASSES, PASSES, PASSES, PASSES),
-    "alter a message that left": (PASSES, FLAGGED, CAUGHT, CAUGHT, FLAGGED),
-    "alter a signed message that had not left": (PASSES, FLAGGED, PASSES, FLAGGED, FLAGGED),
-    "alter a message after the last head": (PASSES, PASSES, PASSES, PASSES, PASSES),
-    "delete a message that left": (PASSES, FLAGGED, CAUGHT, CAUGHT, FLAGGED),
-    "swap the times of two messages that left": (PASSES, FLAGGED, CAUGHT, CAUGHT, FLAGGED),
-    "cut the end, back past the last head": (PASSES, FLAGGED, PASSES, FLAGGED, FLAGGED),
-    "fabricate everything after the hack": (PASSES, PASSES, PASSES, PASSES, PASSES),
-    "re-seal the whole task from scratch": (PASSES, FLAGGED, CAUGHT, CAUGHT, FLAGGED),
-    "backdate the log to before assignment": (PASSES, CAUGHT, CAUGHT, CAUGHT, CAUGHT),
-    "insert a backdated message after the hack": (PASSES, CAUGHT, CAUGHT, CAUGHT, CAUGHT),
-    OLD_PROOF: (PASSES, CAUGHT, CAUGHT, CAUGHT, CAUGHT),
-    BEFORE_START: (PASSES, PASSES, PASSES, PASSES, PASSES),
+    "no attack": (PASSES, PASSES, PASSES, PASSES, PASSES, PASSES, PASSES),
+    "alter a message that left": (PASSES, FLAGGED, CAUGHT, CAUGHT, FLAGGED, CAUGHT, CAUGHT),
+    "alter a signed message that had not left": (
+        PASSES,
+        FLAGGED,
+        PASSES,
+        FLAGGED,
+        FLAGGED,
+        CAUGHT,
+        CAUGHT,
+    ),
+    "alter a message after the last head": (PASSES, PASSES, PASSES, PASSES, PASSES, PASSES, CAUGHT),
+    "delete a message that left": (PASSES, FLAGGED, CAUGHT, CAUGHT, FLAGGED, CAUGHT, CAUGHT),
+    "swap the times of two messages that left": (
+        PASSES,
+        FLAGGED,
+        CAUGHT,
+        CAUGHT,
+        FLAGGED,
+        CAUGHT,
+        CAUGHT,
+    ),
+    "cut the end, back past the last head": (
+        PASSES,
+        FLAGGED,
+        PASSES,
+        FLAGGED,
+        FLAGGED,
+        CAUGHT,
+        CAUGHT,
+    ),
+    "fabricate everything after the hack": (PASSES, PASSES, PASSES, PASSES, PASSES, PASSES, PASSES),
+    "re-seal the whole task from scratch": (
+        PASSES,
+        FLAGGED,
+        CAUGHT,
+        CAUGHT,
+        FLAGGED,
+        CAUGHT,
+        CAUGHT,
+    ),
+    "backdate the log to before assignment": (
+        PASSES,
+        CAUGHT,
+        CAUGHT,
+        CAUGHT,
+        CAUGHT,
+        CAUGHT,
+        CAUGHT,
+    ),
+    "insert a backdated message after the hack": (
+        PASSES,
+        CAUGHT,
+        CAUGHT,
+        CAUGHT,
+        CAUGHT,
+        CAUGHT,
+        CAUGHT,
+    ),
+    OLD_PROOF: (PASSES, CAUGHT, CAUGHT, CAUGHT, CAUGHT, CAUGHT, CAUGHT),
+    BEFORE_START: (PASSES, PASSES, PASSES, PASSES, PASSES, PASSES, PASSES),
 }
 
 
@@ -415,9 +495,9 @@ def v1_outcome(messages: list[Message], folder: Path) -> dict:
     return {"outcome": outcome, "strategy": "seal the hacked log", "reason": "real v1 verify"}
 
 
-def _old_proof_outcome(scenario: Scenario, erased: bool, exported: bool, timed: bool) -> dict:
+def _old_proof_outcome(scenario: Scenario, design: Design) -> dict:
     """Finish a genuine older task, then offer its proof for this one."""
-    run = record_until_hack(scenario, erased, exported, scenario.index_at(HACK_AT), timed)
+    run = record_until_hack(scenario, design, scenario.index_at(HACK_AT))
     identity = run.identity
     _, old_start, old_keys, old_signer = _new_chain(scenario, identity, OLD_TASK, OLD_BLOCK)
     sealer = StreamSealer(OLD_TASK, scenario.epoch_ns, old_signer, start_hash(old_start))
@@ -427,13 +507,13 @@ def _old_proof_outcome(scenario: Scenario, erased: bool, exported: bool, timed: 
     return {"outcome": outcome, "strategy": "submit it as it is", "reason": result.reason}
 
 
-def _before_start_outcome(scenario: Scenario, erased: bool, exported: bool, timed: bool) -> dict:
+def _before_start_outcome(scenario: Scenario, design: Design) -> dict:
     """The hacker owns the recorder from the first moment, so everything it reports is theirs."""
-    run = record_until_hack(scenario, erased, False, 0, timed)
+    run = record_until_hack(scenario, replace(design, exported=False), 0)
     fake = _fabricated(scenario)
     heads = _feed(run.sealer, fake) + run.sealer.finish()
     segments = [Segment(run.start, run.public_keys, heads, fake)]
-    if exported:
+    if design.exported:
         witness = Witness(generate_key())
         witness.register(run.start, run.public_keys)
         witness.submit(heads[-1])
@@ -444,7 +524,6 @@ def _before_start_outcome(scenario: Scenario, erased: bool, exported: bool, time
 
 def run_matrix(scenario: Scenario) -> dict[str, list[dict]]:
     """Every attack against every design. Each row holds one cell per entry in CONFIGS."""
-    designs = ((True, False, False), (False, True, False), (True, True, False), (True, False, True))
     hack = scenario.index_at(HACK_AT)
     matrix: dict[str, list[dict]] = {}
     with tempfile.TemporaryDirectory() as folder:
@@ -452,15 +531,15 @@ def run_matrix(scenario: Scenario) -> dict[str, list[dict]]:
         for name, target in TARGETS.items():
             wanted = target(scenario)
             cells = [v1_outcome(wanted, folder)]
-            for erased, exported, timed in designs:
-                run = record_until_hack(scenario, erased, exported, hack, timed)
+            for design in DESIGNS:
+                run = record_until_hack(scenario, design, hack)
                 cells.append(best_outcome(run, wanted, restamp=name not in TIME_ROWS))
             matrix[name] = cells
         matrix[OLD_PROOF] = [v1_outcome(scenario.messages, folder)] + [
-            _old_proof_outcome(scenario, *design) for design in designs
+            _old_proof_outcome(scenario, design) for design in DESIGNS
         ]
         matrix[BEFORE_START] = [v1_outcome(_fabricated(scenario), folder)] + [
-            _before_start_outcome(scenario, *design) for design in designs
+            _before_start_outcome(scenario, design) for design in DESIGNS
         ]
     return matrix
 

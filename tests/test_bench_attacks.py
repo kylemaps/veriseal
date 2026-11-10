@@ -20,7 +20,8 @@ def matrix(scenario):
 
 
 def _run(scenario, erased=True, exported=True):
-    return attacks.record_until_hack(scenario, erased, exported, scenario.index_at(attacks.HACK_AT))
+    design = attacks.Design(erased=erased, exported=exported)
+    return attacks.record_until_hack(scenario, design, scenario.index_at(attacks.HACK_AT))
 
 
 def test_every_attack_has_an_expectation_and_a_cell_per_design(matrix):
@@ -102,9 +103,8 @@ def test_a_backdated_insert_is_caught_by_the_time_check(matrix):
 
 def test_timed_restart_rejection_names_the_rule(scenario):
     target = attacks._fabricated(scenario)
-    run = attacks.record_until_hack(
-        scenario, True, False, scenario.index_at(attacks.HACK_AT), timed=True
-    )
+    design = attacks.Design(erased=True, exported=False, timed=True)
+    run = attacks.record_until_hack(scenario, design, scenario.index_at(attacks.HACK_AT))
     outcome, result = attacks.judge(run, *attacks.fake_power_cut(run, target))
     assert (outcome, result.reason) == (attacks.CAUGHT, "a message is older than its start record")
 
@@ -116,3 +116,15 @@ def test_the_changed_message_is_named(scenario, matrix):
 
 def test_the_v1_column_runs_the_real_verifier(scenario, tmp_path):
     assert attacks.v1_outcome(scenario.messages, tmp_path)["outcome"] == attacks.PASSES
+
+
+def test_a_sealed_key_closes_the_open_epoch_but_not_what_the_recorder_is_fed(matrix):
+    one_key, sealed = attacks.CONFIGS.index("one key, every head sent"), len(attacks.CONFIGS) - 1
+    open_epoch = matrix["alter a message after the last head"]
+    assert (open_epoch[one_key]["outcome"], open_epoch[sealed]["outcome"]) == (
+        attacks.PASSES,
+        attacks.CAUGHT,
+    )
+    for row in ("fabricate everything after the hack", attacks.BEFORE_START):
+        assert matrix[row][sealed]["outcome"] == attacks.PASSES
+    assert matrix["alter a message that left"][sealed]["strategy"] == "keep_heads"

@@ -35,6 +35,7 @@ from pathlib import Path
 
 VERISEAL = [sys.executable, "-c", "from veriseal.cli import app; app()"]
 STREAM = [sys.executable, "-m", "veriseal.stream"]
+CHAIN = [sys.executable, str(Path(__file__).with_name("chain_baseline.py"))]
 
 
 # power sources
@@ -402,6 +403,28 @@ def measure_stream(
     }
 
 
+def measure_chain(
+    log: Path,
+    epoch_s: float,
+    runs: int,
+    meter: PowerMeter | None,
+    idle_w: float | None,
+    work: Path,
+) -> dict:
+    """Run the per-topic hash chain baseline on *log*, with a checkpoint every *epoch_s*."""
+    out_dir = work / "chain"
+    args = [str(log), "--epoch-seconds", str(epoch_s), "--out-dir", str(out_dir)]
+    measured = [run_measured(args, meter, CHAIN) for _ in range(runs)]
+    checkpoints = out_dir / "checkpoints.jsonl"
+    return {
+        "epoch_s": epoch_s,
+        "checkpoints": len(checkpoints.read_bytes().splitlines()),
+        "checkpoints_bytes": checkpoints.stat().st_size,
+        "seal": summarise(measured, idle_w),
+        "runs": [vars(r) for r in measured],
+    }
+
+
 def measure(argv: list[str] | None = None) -> dict:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("logs", nargs="+", help=".mcap or .bag files, or ROS 2 bag folders")
@@ -418,6 +441,11 @@ def measure(argv: list[str] | None = None) -> dict:
     ap.add_argument(
         "--stream",
         help="also seal as if recording, at these checkpoint intervals in seconds (e.g. 60,10,1)",
+    )
+    ap.add_argument(
+        "--chain-baseline",
+        action="store_true",
+        help="with --stream, also time a keyed hash chain per topic (bench/chain_baseline.py)",
     )
     args = ap.parse_args(argv)
 
@@ -480,6 +508,11 @@ def measure(argv: list[str] | None = None) -> dict:
                     measure_stream(log, float(s), duration_s, args.runs, meter, idle_w, work)
                     for s in args.stream.split(",")
                 ]
+            if args.stream and args.chain_baseline:
+                entry["chain_baseline"] = [
+                    measure_chain(log, float(s), args.runs, meter, idle_w, work)
+                    for s in args.stream.split(",")
+                ]
             extra = entry["seal"].get("extra_energy_j")
             if extra is not None and duration_s > 0:
                 entry["seal_extra_j_per_hour_of_log"] = extra * 3600 / duration_s
@@ -495,7 +528,7 @@ def measure(argv: list[str] | None = None) -> dict:
         shutil.rmtree(work, ignore_errors=True)
 
     Path(args.out).write_text(json.dumps(result, indent=1) + "\n", encoding="utf-8")
-    print(f"\nWrote {args.out}. Please send this file back; it holds no log content.")
+    print(f"\nWrote {args.out}. It holds no log content.")
     return result
 
 

@@ -161,12 +161,13 @@ otherwise idle. On the NUC, the `chmod` line from step 4 lets the script read th
 ```bash
 .venv/bin/python bench/measure.py task-1min.mcap task-10min.mcap task-60min.mcap \
     task-camera.mcap --runs 5 --battery-wh 720 --stream 60,10,1 \
-    --out ~/veriseal-results/nuc-seal.json
+    --chain-baseline --out ~/veriseal-results/nuc-seal.json
 ```
 
-Change `720` if the battery is the 1440 Wh one, and name the file `pi-seal.json` on the Pi.
+Change `720` to the robot's battery capacity in Wh, and name the file `pi-seal.json` on the Pi.
 `--stream 60,10,1` also seals each log as if it were being recorded, with a checkpoint every 60,
-10 and 1 seconds.
+10 and 1 seconds. `--chain-baseline` times an earlier design, a keyed hash chain per topic, on
+the same logs for comparison.
 
 ## 7. Checkpoints over the real network (about 30 minutes per link, on the NUC)
 
