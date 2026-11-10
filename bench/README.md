@@ -64,6 +64,12 @@ python bench/window.py --url http://WITNESS:8787 --witness-pub witness.pub.pem -
 
 The witness prints its public key when it starts: save that as `witness.pub.pem`. It has no login, so keep it on a private network.
 
+A sealer that follows the recorder's file signs each head a little after its epoch ends. `--head-delay SECONDS` adds that delay to every window; take it from `head_delay` in the `stats.json` that `python -m veriseal.tail seal` writes. `bench/plot_window.py` draws one or more results as an SVG chart, with no extra packages:
+
+```bash
+python bench/plot_window.py window-wifi.json window-lte.json --out window.svg
+```
+
 `bench/attacks.py` runs each attack against each design with the real verifiers, and prints any result that differs from the expected one:
 
 ```bash

@@ -146,3 +146,56 @@ def test_real_time_run_over_http_with_an_outage():
         thread.join()
     assert 0.35 <= result["can_delete_worst_s"] < 0.8
     assert result["can_alter_throwaway_worst_s"] < 0.3
+
+
+def test_a_head_signed_late_widens_every_window_by_that_delay():
+    closes = [1 * SECOND, 2 * SECOND, 3 * SECOND]
+    deliveries = [Delivery(i, moment, moment + LATENCY) for i, moment in enumerate(closes)]
+    prompt = window.windows(0, 3 * SECOND, 0, closes, deliveries)
+    delayed = window.windows(0, 3 * SECOND, 0, closes, deliveries, head_delay_ns=3 * SECOND // 2)
+    assert prompt["can_alter_throwaway_worst_s"] == 1.0
+    assert delayed["can_alter_throwaway_worst_s"] == 2.5
+    assert delayed["can_delete_worst_s"] == pytest.approx(prompt["can_delete_worst_s"] + 1.5)
+
+
+# bench/plot_window.py: the chart.
+
+plot = _load("plot_window", REPO / "bench" / "plot_window.py")
+
+
+def _rows(scale=1.0):
+    return [
+        {"export_s": s, "can_alter_throwaway_worst_s": 1.0, "can_delete_worst_s": s * scale + 1}
+        for s in (1, 10, 60)
+    ]
+
+
+def test_ticks_follow_1_2_5():
+    assert plot._ticks(1, 60) == [1, 2, 5, 10, 20, 50]
+    assert plot._bounds([1.05, 61]) == (1, 100)
+    assert plot._bounds([3, 3]) == (2, 5)
+
+
+def test_chart_draws_two_lines_per_file_and_names_each_file(tmp_path):
+    svg = plot.chart([("wifi", _rows()), ("lte", _rows(2))], "Windows")
+    assert svg.count("<polyline") == 4 and svg.count("<circle") == 12
+    assert ">wifi<" in svg and ">lte<" in svg and ">50 s<" in svg
+    import xml.etree.ElementTree as ET
+
+    ET.fromstring(svg)
+
+
+def test_chart_refuses_a_zero_window():
+    rows = _rows()
+    rows[0]["can_alter_throwaway_worst_s"] = 0
+    with pytest.raises(ValueError, match="above zero"):
+        plot.chart([("a", rows)], "t")
+
+
+def test_plot_from_the_command_line(tmp_path):
+    import json
+
+    report = tmp_path / "window-wifi.json"
+    report.write_text(json.dumps({"rows": _rows()}))
+    plot.main([str(report), "--out", str(tmp_path / "w.svg")])
+    assert (tmp_path / "w.svg").read_text(encoding="utf-8").startswith("<svg")

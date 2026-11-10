@@ -16,6 +16,10 @@ Heads that have not left at the moment of the hack don't count, since the hacker
 Before the start record leaves, the hacker can swap the whole key chain, so nothing counts yet.
 Only the time up to the end of the task is swept.
 
+A sealer that follows the recorder's file signs each head some time after its epoch ends, and
+until then the epoch is still open to change. --head-delay adds that time to every window. Take
+it from the ``head_delay`` in the ``stats.json`` that ``python -m veriseal.tail seal`` writes.
+
 By default the clock is simulated, and each send takes the median round trip measured against a
 real witness over HTTP: a local one, or the one at --url. With --live the recording runs in real
 time, so run it against a witness on another machine to measure a real link. --outage START:LENGTH
@@ -93,10 +97,15 @@ def windows(
     start_out_ns: int,
     closes: list[int],
     deliveries: list[Delivery],
+    head_delay_ns: int = 0,
 ) -> dict[str, float]:
-    """The attacker's windows in seconds, from what happened during one recording."""
-    signed = [(max(moment, start_out_ns), moment) for moment in closes]
-    left = [(max(d.delivered_ns, start_out_ns), d.closed_ns) for d in deliveries]
+    """The attacker's windows in seconds, from what happened during one recording.
+
+    *head_delay_ns* is how long after an epoch ends its head is signed. A head protects up to
+    the end of its epoch, but only from the moment it is signed, and it can't leave before that.
+    """
+    signed = [(max(moment + head_delay_ns, start_out_ns), moment) for moment in closes]
+    left = [(max(d.delivered_ns + head_delay_ns, start_out_ns), d.closed_ns) for d in deliveries]
     alter_worst, alter_mean = _sawtooth(start_ns, end_ns, signed)
     delete_worst, delete_mean = _sawtooth(start_ns, end_ns, left)
     return {
@@ -122,6 +131,7 @@ def record(
     retry_ns: int = SECOND,
     start_delay_ns: int = 0,
     log: Callable[[dict], None] | None = None,
+    head_delay_ns: int = 0,
 ) -> dict[str, float]:
     """Run one recording with real heads and return its windows and export cost.
 
@@ -171,7 +181,7 @@ def record(
     end = clock.now()
     retry_until(None)
     start_out = max(client.start_out_ns, began + start_delay_ns)
-    result = windows(began, end, start_out, closes, client.deliveries)
+    result = windows(began, end, start_out, closes, client.deliveries, head_delay_ns)
     hours = (end - began) / SECOND / 3600
     result["sends_per_hour"] = len(client.deliveries) / hours
     result["bytes_per_hour"] = len(client.deliveries) * head_bytes / epochs / hours
@@ -210,6 +220,9 @@ def main() -> None:
     parser.add_argument("--outage", type=_outage, action="append", default=[])
     parser.add_argument("--retry", type=float, default=1.0, help="seconds between retries")
     parser.add_argument("--start-delay", type=float, default=0.0, help="see record()")
+    parser.add_argument(
+        "--head-delay", type=float, default=0.0, help="seconds from an epoch's end to its head"
+    )
     parser.add_argument("--rounds", type=int, default=200, help="round trips to time")
     parser.add_argument("--url", help="a running witness; a local one is used if omitted")
     parser.add_argument("--witness-pub", type=Path, help="that witness's public key (PEM)")
@@ -271,6 +284,7 @@ def main() -> None:
             int(args.retry * SECOND),
             int(args.start_delay * SECOND),
             log,
+            int(args.head_delay * SECOND),
         )
         if log:
             log.close()
@@ -285,6 +299,7 @@ def main() -> None:
     if args.out:
         settings = {k: v for k, v in vars(args).items() if k in ("task", "epoch", "retry", "live")}
         settings |= {"outages_ns": args.outage, "start_delay": args.start_delay}
+        settings["head_delay"] = args.head_delay
         report = {"settings": settings, "latency_ms": {"median": latency * 1000, "p95": p95 * 1000}}
         args.out.write_text(json.dumps(report | {"rows": rows}, indent=1))
 
