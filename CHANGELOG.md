@@ -12,6 +12,11 @@
 
 - `verify --check-bitcoin` and `pack --check-bitcoin`: check the anchor's Bitcoin attestation against the block header, fetched from mempool.space and blockstream.info, which must agree. The result is "verified against Bitcoin" (with block hash and time), "FALSE" (the block doesn't contain the proof) or "could not check" (with the reason).
 - `bench/measure.py`: measures what sealing costs on a given computer (time, CPU, peak memory, and energy where a power sensor exists: Jetson, Raspberry Pi 5, Intel RAPL, battery). See `bench/README.md`.
+- Experimental streaming seal (`veriseal.stream`): signs a head for each epoch of a log while it is being recorded, with a one-time key per epoch that is erased after use. Not covered by `SPEC-manifest.md` yet, and its format may change.
+- `python -m veriseal.tail seal|verify`: seals a recorder's MCAP file as it grows, and checks the result.
+- `python -m veriseal.witness`: a small HTTP witness that stores each head it is sent and returns a signed receipt.
+- `bench/`: `window.py` (how long a change could go unnoticed), `attacks.py` (attack table against the real verifiers), `memory_dump.py` (are erased keys gone from memory), `live_replay.py` (cost of sealing beside the ROS 2 recorder) and `ros2_replay/` (Docker harness). `bench/RUNS.md` is a step-by-step runbook.
+- `veriseal --version`.
 - `--key-passphrase-env VAR`: `keygen` encrypts the new key with the passphrase in environment variable `VAR`, and `seal` uses it to decrypt the key.
 
 ### Changed
