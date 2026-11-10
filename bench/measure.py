@@ -34,6 +34,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 VERISEAL = [sys.executable, "-c", "from veriseal.cli import app; app()"]
+STREAM = [sys.executable, "-m", "veriseal.stream"]
 
 
 # power sources
@@ -267,12 +268,12 @@ class Run:
     extra: dict = field(default_factory=dict)
 
 
-def run_measured(args: list[str], meter: PowerMeter | None) -> Run:
+def run_measured(args: list[str], meter: PowerMeter | None, command: list[str] = VERISEAL) -> Run:
     """Run veriseal with *args* as a child process; time it and read its own resource usage."""
     if meter:
         meter.start()
     t0 = time.perf_counter()
-    proc = subprocess.Popen(VERISEAL + args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    proc = subprocess.Popen(command + args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     if hasattr(os, "wait4"):
         out = proc.stdout.read()
         _, status, usage = os.wait4(proc.pid, 0)
@@ -368,6 +369,39 @@ def summarise(runs: list[Run], idle_w: float | None) -> dict:
     return out
 
 
+def measure_stream(
+    log: Path,
+    epoch_s: float,
+    duration_s: float,
+    runs: int,
+    meter: PowerMeter | None,
+    idle_w: float | None,
+    work: Path,
+) -> dict:
+    """Seal *log* as if it were being recorded, with a checkpoint every *epoch_s* seconds."""
+    out_dir = work / "stream"
+    out_dir.mkdir(exist_ok=True)
+    args = [
+        str(log),
+        "--epoch-seconds",
+        str(epoch_s),
+        "--keys",
+        str(int(duration_s / epoch_s) + 2),
+        "--out-dir",
+        str(out_dir),
+    ]
+    measured = [run_measured(args, meter, STREAM) for _ in range(runs)]
+    heads = out_dir / "heads.jsonl"
+    return {
+        "epoch_s": epoch_s,
+        "heads": len(heads.read_bytes().splitlines()),
+        "heads_bytes": heads.stat().st_size,
+        "leaves_bytes": (out_dir / "leaves.bin").stat().st_size,
+        "seal": summarise(measured, idle_w),
+        "runs": [vars(r) for r in measured],
+    }
+
+
 def measure(argv: list[str] | None = None) -> dict:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("logs", nargs="+", help=".mcap or .bag files, or ROS 2 bag folders")
@@ -381,6 +415,10 @@ def measure(argv: list[str] | None = None) -> dict:
     )
     ap.add_argument("--idle-seconds", type=float, default=10, help="idle power window (default 10)")
     ap.add_argument("--battery-wh", type=float, help="robot battery capacity, for a %% figure")
+    ap.add_argument(
+        "--stream",
+        help="also seal as if recording, at these checkpoint intervals in seconds (e.g. 60,10,1)",
+    )
     args = ap.parse_args(argv)
 
     logs = log_files(args.logs)
@@ -437,6 +475,11 @@ def measure(argv: list[str] | None = None) -> dict:
                 "seal_runs": [vars(r) for r in seals],
                 "verify_runs": [vars(r) for r in verifies],
             }
+            if args.stream:
+                entry["stream"] = [
+                    measure_stream(log, float(s), duration_s, args.runs, meter, idle_w, work)
+                    for s in args.stream.split(",")
+                ]
             extra = entry["seal"].get("extra_energy_j")
             if extra is not None and duration_s > 0:
                 entry["seal_extra_j_per_hour_of_log"] = extra * 3600 / duration_s

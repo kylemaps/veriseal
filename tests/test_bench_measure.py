@@ -130,3 +130,17 @@ def test_one_offline_run_end_to_end(tmp_path: Path) -> None:
     assert entry["seal"]["wall_s"] > 0 and entry["verify"]["wall_s"] > 0
     assert result["power_source"] is None
     assert "log.mcap" in entry["file"] and str(tmp_path) not in json.dumps(result)
+
+
+def test_stream_mode_reports_checkpoints(tmp_path: Path) -> None:
+    make_sample = _load("make_sample", REPO / "demo" / "make_sample.py")
+    log = tmp_path / "log.mcap"
+    make_sample.write_sample(log)
+    out = tmp_path / "results.json"
+    args = [str(log), "--runs", "1", "--idle-seconds", "0", "--power", "none", "--out", str(out)]
+    measure.measure(args + ["--stream", "1,0.5"])
+    stream = json.loads(out.read_text(encoding="utf-8"))["logs"][0]["stream"]
+    assert [row["epoch_s"] for row in stream] == [1.0, 0.5]
+    assert stream[1]["heads"] > stream[0]["heads"] >= 1
+    assert stream[0]["leaves_bytes"] == 32 * 198
+    assert stream[0]["seal"]["wall_s"] > 0
