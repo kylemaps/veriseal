@@ -87,8 +87,9 @@ class Design:
     *timed*: start records are timed. *sealed*: the keys sit in hardware the hacker can't read,
     so the hacker can still feed the recorder but can't sign anything themselves.
 
-    The last two columns model the earlier approach of one long-lived key with every checkpoint
-    sent to a ledger, without and with trusted hardware. They assume the link never drops.
+    The last two columns model the earlier approach of one long-lived key with checkpoints sent
+    to a ledger, without and with trusted hardware. They are its best case: every checkpoint is
+    sent and the link never drops.
     """
 
     erased: bool

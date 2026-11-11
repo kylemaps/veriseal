@@ -165,10 +165,12 @@ def test_chain_baseline_links_depend_on_every_earlier_message() -> None:
 
     def links(log):
         made = baseline.chain_checkpoints(log, 1_000_000_000, b"k" * 32, lambda m: b"")
-        return {(c["topic"], c["epoch"]): (c["count"], c["link"]) for c in made}
+        return {(c["topic"], c["epoch"]): (c["index"], c["digest"]) for c in made}
 
     honest = links(messages)
     assert set(honest) == {(t, e) for t in ("/t0", "/t1") for e in range(3)}
     assert honest[("/t0", 2)][0] == 6
     changed = links([messages[0][:2] + (b"x",)] + messages[1:])
     assert [key for key in honest if honest[key] != changed[key]] == [("/t0", e) for e in range(3)]
+    other = baseline.chain_checkpoints(messages, 1_000_000_000, b"n" * 32, lambda m: b"")
+    assert all(c["digest"] != honest[(c["topic"], c["epoch"])][1] for c in other)
