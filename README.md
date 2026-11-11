@@ -4,7 +4,7 @@ For incident investigators and safety teams who need to prove a robot/autonomy l
 
 A CLI that seals a robot/autonomy log (MCAP) with an Ed25519 signature and an OpenTimestamps proof anchored in Bitcoin, producing a `.seal.json` manifest. A disinterested party can later prove "this log matches a seal made by key K", but only if the verifier **pins the signer's key** (`--pubkey`). Without key pinning, a tampered re-seal with a new key still passes. The seal also carries an OpenTimestamps proof that it existed no later than a given Bitcoin block, and `veriseal verify --check-bitcoin` checks that proof against the block itself.
 
-> **Status:** early v0.1, solo project: seal/verify/inspect/pack work end-to-end, but APIs may change. Adversarial feedback welcome: [open an issue](https://github.com/kylemaps/veriseal/issues).
+> **Status:** 0.2. `seal`, `verify`, `inspect` and `pack` use the stable v1 seal format. The streaming seal (`veriseal stream`) is experimental and its format may change. Adversarial feedback welcome: [open an issue](https://github.com/kylemaps/veriseal/issues).
 
 ![CI](https://github.com/kylemaps/veriseal/actions/workflows/ci.yml/badge.svg)
 
@@ -252,9 +252,9 @@ inspect  filter MCAP to time window → print chronological event timeline →
 
 ## Roadmap
 
-- **v0.1:** seal / verify / inspect / pack on MCAP + OpenTimestamps anchor; independent web verifier; Foxglove panel
-- **v0.2:** chain-of-custody log; RFC 3161 + Sigstore/Rekor option; ROS 2 SQLite (`.db3`) bag ingest; HTML report
-- **v0.3:** web viewer; sealing daemon; pluggable transparency-log backend
+- **0.1:** seal, verify, inspect and pack for MCAP and ROS 1 bags; OpenTimestamps anchor with a check against Bitcoin; independent web verifier; Foxglove panel
+- **0.2:** experimental streaming seal: heads signed while recording with one-time keys, a witness, a draft spec and test files
+- **Next:** settle the streaming format against measurements on robot hardware; smaller seal files with per-message proofs; ROS 2 SQLite (`.db3`) input; RFC 3161 or Sigstore/Rekor timestamps
 
 ## Contributing
 
