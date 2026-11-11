@@ -10,7 +10,7 @@ Include what you can of the following:
 - the files or steps that show the problem; a small synthetic log is ideal
 - what you expected and what happened
 
-Expect a first reply within 14 days. Once a fix is released, the report is credited in the changelog unless you ask otherwise.
+Once a fix is released, the report is credited in the changelog unless you ask otherwise.
 
 ## What counts
 

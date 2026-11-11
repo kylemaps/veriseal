@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.2.0 (2026-11-11)
+
 ### Breaking
 
 - `veriseal seal` needs a signer key: `--key PATH` for an existing key, or `--new-key PATH` to create one. It never creates or overwrites a key on its own any more. Library: `seal(path, key_path=...)` or `seal(path, new_key_path=...)`.

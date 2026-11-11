@@ -34,7 +34,6 @@ Python for veriseal without touching the system one:
 curl -LsSf https://astral.sh/uv/install.sh | sh     # then open a new terminal
 git clone https://github.com/kylemaps/veriseal.git
 cd veriseal
-git checkout feat/streaming-seal
 uv venv --python 3.12 .venv
 uv pip install --python .venv/bin/python -e ".[ros1]"
 mkdir -p ~/veriseal-results

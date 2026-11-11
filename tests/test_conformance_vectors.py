@@ -140,13 +140,15 @@ def test_bag_vector_records_rosbag1_format() -> None:
     assert manifest["messages"]["count"] == 10
 
 
-def test_bag_vector_is_reproducible_from_the_published_seed() -> None:
+def test_bag_vector_is_reproducible_from_the_published_seed(monkeypatch) -> None:
     """Re-sealing with the documented seed and timestamp must be byte-identical.
 
     Anyone must be able to regenerate this vector. If this fails, either the seed/time
     in conformance/README.md is wrong or something in the manifest construction stopped
-    being deterministic.
+    being deterministic. The vector records the version that made it, 0.1.1, and stays as
+    published across releases.
     """
+    monkeypatch.setattr("veriseal.__version__", "0.1.1")
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
     from veriseal.formats import detect_format, iter_messages
