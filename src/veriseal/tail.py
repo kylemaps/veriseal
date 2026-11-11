@@ -517,9 +517,9 @@ def _verify(args: argparse.Namespace) -> int:
     return EXIT_FAILED
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None, prog: str | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+        prog=prog, description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     commands = parser.add_subparsers(dest="command", required=True)
     seal = commands.add_parser("seal", help="seal a log while it is being recorded")

@@ -438,14 +438,14 @@ class ExportClient:
         return True
 
 
-def _main() -> None:
+def main(argv: list[str] | None = None, prog: str | None = None) -> None:
     """Run a witness until stopped. It has no login, so keep it on a private network."""
-    parser = argparse.ArgumentParser(description=_main.__doc__)
+    parser = argparse.ArgumentParser(prog=prog, description=main.__doc__)
     parser.add_argument("--key", type=Path, help="witness signing key; omit for a new one")
     parser.add_argument("--store", type=Path, required=True, help="file that holds what it keeps")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8787)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     key = load_private_pem(args.key) if args.key else generate_key()
     print(public_pem(key), flush=True)
     server = serve(Witness(key, args.store), args.host, args.port)
@@ -454,4 +454,4 @@ def _main() -> None:
 
 
 if __name__ == "__main__":
-    _main()
+    main()

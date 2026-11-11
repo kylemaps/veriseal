@@ -20,6 +20,17 @@ anchor_app = typer.Typer(
     no_args_is_help=True,
 )
 app.add_typer(anchor_app, name="anchor")
+stream_app = typer.Typer(
+    help="Experimental: seal a log while it is being recorded. See SPEC-stream.md.",
+    no_args_is_help=True,
+)
+app.add_typer(stream_app, name="stream")
+# The stream commands hand their arguments to the modules' own parsers untouched.
+_PASS_THROUGH = {
+    "allow_extra_args": True,
+    "ignore_unknown_options": True,
+    "help_option_names": [],
+}
 console = Console()
 
 
@@ -281,6 +292,42 @@ def inspect(
         console.print(f"[bold red]ERROR:[/bold red] {exc}")
         raise typer.Exit(code=2)
     raise typer.Exit(code=inspect_mcap(path, from_ns, to_ns, topic, out))
+
+
+@stream_app.command("seal", context_settings=_PASS_THROUGH)
+def stream_seal(ctx: typer.Context) -> None:
+    """Follow a recorder's MCAP file as it grows and sign a head for each epoch.
+
+    veriseal stream seal LOG --out-dir DIR [--witness URL --witness-pub PEM]. Pass --help
+    for every option.
+    """
+    from veriseal.tail import main
+
+    raise typer.Exit(code=main(["seal", *ctx.args], prog="veriseal stream"))
+
+
+@stream_app.command("verify", context_settings=_PASS_THROUGH)
+def stream_verify(ctx: typer.Context) -> None:
+    """Check a finished log against its streaming seal.
+
+    veriseal stream verify LOG --out-dir DIR. Exits 0 when the log matches, 1 when it does
+    not, and 2 when it matches but some messages were sealed late.
+    """
+    from veriseal.tail import main
+
+    raise typer.Exit(code=main(["verify", *ctx.args], prog="veriseal stream"))
+
+
+@stream_app.command("witness", context_settings=_PASS_THROUGH)
+def stream_witness(ctx: typer.Context) -> None:
+    """Run a witness: keep each head it is sent and sign a receipt for it.
+
+    veriseal stream witness --store FILE [--key PEM --host HOST --port PORT]. It has no
+    login, so keep it on a private network.
+    """
+    from veriseal.witness import main
+
+    main(list(ctx.args), prog="veriseal stream witness")
 
 
 @anchor_app.command("upgrade")
