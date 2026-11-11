@@ -122,6 +122,21 @@ def test_measure_latency_times_real_requests():
     assert times[0] > 0
 
 
+def test_real_clock_waits_until_a_coarse_clock_reads_the_moment(monkeypatch):
+    tick = 15_625_000  # Windows' default timer resolution
+    now = [0]
+
+    def sleep(seconds: float) -> None:
+        now[0] += max(0, int(seconds * SECOND) - 1_000_000)  # wakes a little early
+
+    monkeypatch.setattr(window.time, "monotonic_ns", lambda: now[0] // tick * tick)
+    monkeypatch.setattr(window.time, "sleep", sleep)
+    clock = window.RealClock()
+    for moment in (3 * SECOND // 10, 4 * SECOND // 10, 6 * SECOND // 10):
+        clock.wait_until(moment)
+        assert clock.now() >= moment
+
+
 def test_real_time_run_over_http_with_an_outage():
     """The same recording on a real clock and a real socket, scaled down to about a second."""
     key = generate_key()

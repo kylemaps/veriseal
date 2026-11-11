@@ -71,7 +71,11 @@ class RealClock:
         return time.monotonic_ns()
 
     def wait_until(self, moment: int) -> None:
-        time.sleep(max(0, moment - self.now()) / SECOND)
+        # Keep waiting until the clock itself reads *moment*. On a coarse clock (Windows, Python
+        # 3.11 and older: about 16 ms) a sleep can end before the next tick, and a send would
+        # then be timed just before a boundary it should fall after.
+        while (left := moment - self.now()) > 0:
+            time.sleep(left / SECOND)
 
 
 def _sawtooth(start_ns: int, end_ns: int, resets: Iterable[tuple[int, int]]) -> tuple[int, float]:
