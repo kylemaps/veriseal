@@ -18,6 +18,8 @@
 - `bench/`: `window.py` (how long a change could go unnoticed), `attacks.py` (attack table against the real verifiers), `memory_dump.py` (are erased keys gone from memory), `live_replay.py` (cost of sealing beside the ROS 2 recorder) and `ros2_replay/` (Docker harness). `bench/RUNS.md` is a step-by-step runbook.
 - `python -m veriseal.tail` follows a recording the recorder splits into several files (`name_0.mcap`, `name_1.mcap`, ...). `verify` exits `2` and prints LATE when the log matches every head but some messages were sealed longer after their times than `--max-lag-ms` allows.
 - `SPEC-stream.md`: draft specification of the streaming seal.
+- `veriseal stream seal`, `veriseal stream verify` and `veriseal stream witness`: the streaming seal from the main command.
+- `conformance/stream/`: test files for the streaming format, with `conformance/check_stream.py`, a second verifier written from the specification alone.
 - `bench/`: `window.py --head-delay`, `plot_window.py` (SVG chart of the windows), two baseline columns in `attacks.py`, and `chain_baseline.py` with `measure.py --chain-baseline`.
 - `CONTRIBUTING.md` and `SECURITY.md`.
 - `veriseal --version`.

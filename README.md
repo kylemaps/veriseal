@@ -202,18 +202,18 @@ The pack is evidence infrastructure, not a compliance certificate: it supports d
 
 ```bash
 # on another machine: keep each head and sign a receipt for it
-python -m veriseal.witness --key witness.key.pem --store witness.jsonl --host 0.0.0.0 --port 8787
+veriseal stream witness --key witness.key.pem --store witness.jsonl --host 0.0.0.0 --port 8787
 
 # beside the recorder: follow its MCAP file as it grows
 ros2 bag record -s mcap --storage-preset-profile fastwrite -o task /topics ...
-python -m veriseal.tail seal task/task_0.mcap --out-dir sealed \
+veriseal stream seal task/task_0.mcap --out-dir sealed \
     --witness http://WITNESS:8787 --witness-pub witness.pub.pem
 
 # afterwards: exit 0 = matches, 1 = does not, 2 = matches but sealed late
-python -m veriseal.tail verify task/task_0.mcap --out-dir sealed
+veriseal stream verify task/task_0.mcap --out-dir sealed
 ```
 
-The sealer follows a recording that the recorder splits into several files, and the seal stays valid when the file is rewritten in another order or compression. The format is specified in [SPEC-stream.md](https://github.com/kylemaps/veriseal/blob/main/SPEC-stream.md). It is a draft and can change; it is not part of the `veriseal` command yet. [`bench/`](https://github.com/kylemaps/veriseal/tree/main/bench) holds the tools that measure its cost and test it against attacks.
+The sealer follows a recording that the recorder splits into several files, and the seal stays valid when the file is rewritten in another order or compression. The format is specified in [SPEC-stream.md](https://github.com/kylemaps/veriseal/blob/main/SPEC-stream.md). It is a draft and can change. [`conformance/stream/`](https://github.com/kylemaps/veriseal/tree/main/conformance) holds test files and a second verifier written from the specification alone. [`bench/`](https://github.com/kylemaps/veriseal/tree/main/bench) holds the tools that measure its cost and test it against attacks.
 
 ## Threat model
 

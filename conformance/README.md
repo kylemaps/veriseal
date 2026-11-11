@@ -130,3 +130,33 @@ Passing them is not full conformance. They leave out:
   behaviour; topics are expected to be ASCII.
 - Unknown schema versions. There is no vector for how a verifier should treat a
   `schema_version` it does not recognise, because the spec does not yet say.
+
+## Streaming seal vectors
+
+[`stream/`](stream/) holds vectors for the draft streaming format in
+[SPEC-stream.md](../SPEC-stream.md). Each case is a log and a seal folder (`start.json`,
+`keys.json`, `heads.jsonl`, `leaves.bin`), with one-second epochs.
+
+| Log | Seal folder | Expected verdict |
+|---|---|---|
+| `log.mcap` | `sealed/` | OK: 40 messages, 4 heads |
+| `log.reordered.mcap` | `sealed/` | OK: the same messages written in another order |
+| `log.tampered.mcap` | `sealed/` | FAILED: one payload changed in epoch 1 |
+| `log.missing.mcap` | `sealed/` | FAILED: one message removed from epoch 1 |
+| `late.mcap` | `late-sealed/` | LATE: two messages sealed late, one by 100 ms (exactly the default limit) and one by 2.6 s |
+| `late.mcap` | `late-sealed/`, limit 3000 ms | OK |
+| `late.mcap` | `sealed/` | OK: it holds the same messages as `log.mcap` |
+
+`log.mcap` has two messages with the same log time, which tests the tie-break in the order
+rule. The keys come from fixed seeds and are public: never use them for anything else.
+
+[`check_stream.py`](check_stream.py) is a second verifier written from the specification
+alone. It imports nothing from veriseal.
+[`tests/test_conformance_stream.py`](../tests/test_conformance_stream.py) runs it and the
+reference verifier on every case and requires the same verdict from both.
+[`make_stream_vectors.py`](make_stream_vectors.py) rebuilds the vectors, and the same test
+checks that the seal files come out byte for byte the same.
+
+```bash
+python conformance/check_stream.py conformance/stream/log.mcap conformance/stream/sealed
+```
